@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=VOID Desktop Assistant
+Comment=VOID Autonomous Personal AI Desktop Assistant
+Exec=/home/prakash/.local/bin/void-launcher.py
+Path=/home/prakash
+Terminal=false
+Icon=applications-system
+Categories=Utility;System;AudioVideo;
+X-GNOME-Autostart-enabled=true
+X-KDE-autostart-phase=2
+StartupNotify=false
+

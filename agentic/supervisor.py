@@ -1,0 +1,189 @@
+"""
+VOID Agentic OS - Supervisor Agent
+The central intelligence and command coordinator of the Multi-Agent architecture.
+Classifies requests between deterministic fast-paths and multi-agent workflows,
+orchestrates execution, records persistent memory, and synthesizes verifiable deliverables.
+"""
+
+import time
+import logging
+from typing import Dict, Any, List, Optional, Callable
+from agentic.types import (
+    AgentRole,
+    AgentTask,
+    WorkflowPlan,
+    WorkflowLifecycleState,
+    TaskStatus,
+)
+from agentic.agents.base import BaseAgent
+from agentic.orchestrator import MultiAgentOrchestrator
+from agentic.tools import ToolRegistry
+from agentic.providers import AIProviderManager
+from agentic.permissions import PermissionManager
+from agentic.memory import AgentMemoryManager
+from agentic.audit import AuditLogger
+
+logger = logging.getLogger("VOID.Agentic.Supervisor")
+
+
+class SupervisorAgent(BaseAgent):
+    """
+    Supervisor Agent that understands high-level intent, manages multi-agent workflows,
+    ensures safety boundaries, and delivers verifiable results.
+    """
+
+    # Utterance keywords that strongly signal an agentic, multi-step workflow
+    AGENTIC_KEYWORDS = [
+        "investigate", "diagnostic", "diagnose", "bottleneck", "scaffold",
+        "unit test", "fix bug", "research and write", "executive summary",
+        "multi-agent", "agentic", "compile report", "system audit",
+        "demo 1", "demo 2", "demo 3", "demo 4", "verify code",
+    ]
+
+    # Explicit direct commands that must always remain in the sub-5ms fast path
+    FAST_PATH_EXACT = [
+        "volume up", "volume down", "mute", "unmute",
+        "screen brighter", "screen dimmer", "cancel", "stop dictation",
+        "start ollama", "stop ollama",
+    ]
+
+    def __init__(
+        self,
+        tools: ToolRegistry,
+        provider_manager: AIProviderManager,
+        permission_manager: PermissionManager,
+        memory_manager: Optional[AgentMemoryManager] = None,
+        audit_logger: Optional[AuditLogger] = None,
+        on_state_change: Optional[Callable[[WorkflowLifecycleState, WorkflowPlan, Optional[AgentTask]], None]] = None,
+    ):
+        super().__init__(
+            role=AgentRole.SUPERVISOR,
+            name="SupervisorAgent",
+            description="Coordinates multi-agent planning, execution, verification, and memory.",
+            tools=tools,
+            provider_manager=provider_manager,
+        )
+        self.perm_mgr = permission_manager
+        self.memory_mgr = memory_manager or AgentMemoryManager()
+        self.audit_logger = audit_logger or AuditLogger()
+        self.orchestrator = MultiAgentOrchestrator(
+            tools=tools,
+            provider_manager=provider_manager,
+            permission_manager=permission_manager,
+            on_state_change=on_state_change,
+        )
+
+    def classify_intent(self, text: str) -> Dict[str, Any]:
+        """
+        Determines whether the input is a deterministic fast-path or an agentic workflow.
+        Guarantees sub-millisecond classification overhead.
+        """
+        clean = text.strip().lower()
+
+        # 1. Exact match fast paths
+        if clean in self.FAST_PATH_EXACT:
+            return {"mode": "FAST_PATH", "reason": "Exact match direct hardware command"}
+
+        # 2. Hardware pattern match (e.g. "volume 50%", "brightness 80%")
+        if clean.startswith("volume ") or clean.startswith("brightness ") or clean.startswith("set volume"):
+            return {"mode": "FAST_PATH", "reason": "Hardware direct command"}
+
+        # 3. Simple media / app launcher
+        if clean.startswith("open ") and len(clean.split()) <= 2:
+            return {"mode": "FAST_PATH", "reason": "Simple single app launch"}
+
+        # 4. Multi-agent workflow trigger
+        if any(kw in clean for kw in self.AGENTIC_KEYWORDS):
+            return {"mode": "AGENTIC_WORKFLOW", "reason": "Contains multi-agent workflow triggers"}
+
+        # 5. Length / complexity heuristic
+        if len(clean.split()) > 7 and (" and " in clean or " then " in clean or "report" in clean):
+            return {"mode": "AGENTIC_WORKFLOW", "reason": "Multi-clause complex goal"}
+
+        return {"mode": "FAST_PATH", "reason": "Default single-turn query"}
+
+    def execute_goal(
+        self,
+        goal: str,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Executes a high-level user goal using the full Multi-Agent pipeline:
+        Planner -> Orchestrator -> Specialized Agents -> Verifier -> Memory & Audit.
+        """
+        start_time = time.time()
+        self.audit_logger.log_event("WORKFLOW_START", self.name, details={"goal": goal})
+
+        # 1. Generate plan via PlannerAgent
+        plan = self.orchestrator.planner.create_plan(goal, context)
+        self.audit_logger.log_event("PLAN_CREATED", "PlannerAgent", details={"plan_id": plan.plan_id, "tasks": len(plan.tasks)})
+
+        # 2. Execute plan via MultiAgentOrchestrator
+        completed_plan = self.orchestrator.execute_plan(plan, context)
+        duration = round(time.time() - start_time, 3)
+
+        # 3. Record task memory and workflow history
+        for task in completed_plan.tasks:
+            self.memory_mgr.save_task(task)
+
+        self.memory_mgr.record_workflow_completion(completed_plan)
+
+        # 4. Synthesize final speech & text response
+        synthesis = self._synthesize_summary(completed_plan, duration)
+
+        self.audit_logger.log_event(
+            "WORKFLOW_END",
+            self.name,
+            details={
+                "plan_id": completed_plan.plan_id,
+                "state": completed_plan.state.value,
+                "artifacts": synthesis["artifacts"],
+            },
+            success=(completed_plan.state == WorkflowLifecycleState.COMPLETED),
+            duration_sec=duration,
+        )
+
+        return {
+            "plan_id": completed_plan.plan_id,
+            "goal": completed_plan.goal,
+            "state": completed_plan.state.value,
+            "success": (completed_plan.state == WorkflowLifecycleState.COMPLETED),
+            "summary_text": synthesis["summary_text"],
+            "artifacts": synthesis["artifacts"],
+            "tasks_completed": sum(1 for t in completed_plan.tasks if t.status == TaskStatus.COMPLETED),
+            "total_tasks": len(completed_plan.tasks),
+            "duration_sec": duration,
+            "plan": completed_plan,
+        }
+
+    def _synthesize_summary(self, plan: WorkflowPlan, duration_sec: float) -> Dict[str, Any]:
+        """Creates a clear, truthful summary without hallucinations."""
+        all_artifacts = []
+        for t in plan.tasks:
+            if t.result and t.result.artifacts:
+                all_artifacts.extend(t.result.artifacts)
+        artifacts = list(dict.fromkeys(all_artifacts))  # deduplicate preserving order
+
+        completed_count = sum(1 for t in plan.tasks if t.status == TaskStatus.COMPLETED)
+        total_count = len(plan.tasks)
+
+        if plan.state == WorkflowLifecycleState.COMPLETED:
+            summary = f"Workflow completed successfully in {duration_sec}s. All {completed_count} tasks verified."
+            if artifacts:
+                summary += f" Generated {len(artifacts)} artifact(s): {', '.join(artifacts)}."
+        elif plan.state == WorkflowLifecycleState.WAITING_APPROVAL:
+            pending = next((t for t in plan.tasks if t.status == TaskStatus.WAITING_APPROVAL), None)
+            desc = pending.description if pending else "action"
+            summary = f"Workflow paused: User approval required for {desc}."
+        elif plan.state == WorkflowLifecycleState.CANCELLED:
+            summary = f"Workflow was cancelled. {completed_count} of {total_count} tasks had finished."
+        else:
+            failed_task = next((t for t in plan.tasks if t.status == TaskStatus.FAILED), None)
+            err = failed_task.error if failed_task else "Unknown execution error"
+            summary = f"Workflow failed at step '{failed_task.description if failed_task else 'unknown'}': {err}"
+
+        return {
+            "summary_text": summary,
+            "artifacts": artifacts,
+        }
+
