@@ -1,0 +1,18 @@
+# Heavy model weights (exceeds GitHub 100MB file limit)
+models/
+*.onnx
+*.bin
+*.safetensors
+*.gguf
+
+# Local archives and backups
+backups/
+.venv/
+__pycache__/
+*.pyc
+
+# Local runtime logs & dynamic files
+logs/
+*.log
+/tmp/
+
