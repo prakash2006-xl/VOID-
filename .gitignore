@@ -15,4 +15,9 @@ __pycache__/
 logs/
 *.log
 /tmp/
+memory/
+*.bak*
+test_pill_crop.png
+config/ai_providers.json
+config/.void_launcher.json
 

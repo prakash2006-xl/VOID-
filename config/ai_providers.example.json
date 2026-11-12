@@ -1,0 +1,9 @@
+{
+  "mode": "local",
+  "cloud": {
+    "enabled": false,
+    "api_base": "https://api.openai.com/v1",
+    "api_key": "",
+    "model": "gpt-4o-mini"
+  }
+}

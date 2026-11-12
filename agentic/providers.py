@@ -203,6 +203,39 @@ class AIProviderManager:
         else:
             self.cloud_provider = None
 
+    def is_local_online(self) -> bool:
+        """Checks if local Ollama daemon is currently responsive."""
+        status = self.local_provider.test_connection()
+        return bool(status.get("online", False))
+
+    def is_cloud_configured(self) -> bool:
+        """Checks if a valid cloud provider with API key is loaded."""
+        return self.cloud_provider is not None and bool(getattr(self.cloud_provider, "api_key", ""))
+
+    def configure_cloud(
+        self,
+        api_key: str,
+        model: str = "gpt-4o-mini",
+        api_base: str = "https://api.openai.com/v1"
+    ) -> Dict[str, Any]:
+        """Configures and activates a cloud AI provider safely with secret masking."""
+        clean_key = api_key.strip()
+        clean_model = model.strip() or "gpt-4o-mini"
+        clean_base = api_base.strip() or "https://api.openai.com/v1"
+
+        self.save_cloud_config(api_base=clean_base, api_key=clean_key, model=clean_model, enabled=True)
+        self.mode = "cloud"
+
+        masked = f"{clean_key[:3]}...{clean_key[-4:]}" if len(clean_key) > 8 else "******"
+        return {
+            "success": True,
+            "provider": "CloudOpenAICompatible",
+            "model": clean_model,
+            "api_base": clean_base,
+            "masked_key": masked,
+            "mode": self.mode
+        }
+
     def route_provider(self, task_type: str = "general", is_sensitive: bool = False) -> BaseAIProvider:
         """
         Routes execution to local or cloud provider based on doctrine:
@@ -223,3 +256,50 @@ class AIProviderManager:
             return self.local_provider
 
         return self.local_provider
+
+
+def parse_cloud_credentials(text: str) -> tuple[str, str, str]:
+    """
+    Extracts (model, api_key, api_base) from free-form user speech or text input.
+    Supports OpenAI, OpenRouter, Anthropic, Groq, DeepSeek patterns.
+    """
+    import re
+    model = "gpt-4o-mini"
+    api_key = ""
+    api_base = "https://api.openai.com/v1"
+
+    # 1. Match API key
+    key_match = (
+        re.search(r"\b(sk-[a-zA-Z0-9_\-]{8,})\b", text) or
+        re.search(r"(?:api[_-]?key|key)\s*(?:is|=|:)?\s*([a-zA-Z0-9_\-]{16,})", text, re.I) or
+        re.search(r"\b(gsk_[a-zA-Z0-9_\-]{16,})\b", text) or
+        re.search(r"\b([a-zA-Z0-9_\-]{24,})\b", text)
+    )
+    if key_match:
+        api_key = key_match.group(1).strip()
+
+    # 2. Match Model
+    model_match = re.search(r"(?:model\s*(?:is|=|:)?\s*|model\s+)([a-zA-Z0-9_\-\.:]+)", text, re.I)
+    if model_match:
+        cand = model_match.group(1).strip()
+        if not cand.startswith("sk-") and len(cand) < 40:
+            model = cand
+    else:
+        known_models = [
+            "gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo",
+            "claude-3-5-sonnet", "claude-3-haiku", "gemini-1.5-pro", "gemini-1.5-flash",
+            "llama-3.1-70b", "llama-3.1-8b", "llama-3", "deepseek-chat", "deepseek-coder",
+            "mixtral-8x7b", "qwen-2.5-72b"
+        ]
+        for km in known_models:
+            if km in text.lower():
+                model = km
+                break
+
+    # 3. Match Custom API Base
+    base_match = re.search(r"(https?://[^\s]+)", text)
+    if base_match:
+        api_base = base_match.group(1).strip()
+
+    return model, api_key, api_base
+

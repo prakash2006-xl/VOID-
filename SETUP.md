@@ -282,6 +282,11 @@ for t in tests:
 | **Document Drafting** | *"Draft docx on Quantum Computing"*, *"Create excel for budget"* | Creates fully formatted Word (`.docx`) or Excel (`.xlsx`) files. |
 | **Brain Lifecycle** | *"Start ollama"*, *"Activate brain"*, *"Put brain on standby"*, *"Stop ollama"* | Dynamically unloads/loads models from GPU memory (saving 2 GB VRAM). |
 | **Emergency Abort** | *"Stop"*, *"Cancel"*, *"Shut up"*, *"Stop talking"*, *"Stop thinking"* | Instantly interrupts speech and neural processing in `< 5ms`. |
+| **7-Day High Memory Synthesis** | *"Generate weekly memory"*, *"Save weekly memory"*, *"Create weekly memory file"* | Aggregates 7 days of thought traces and deliverables into structured JSON & Markdown digests. |
+| **Weekly Memory Recall** | *"What did we do this week"*, *"Weekly recap"*, *"Recall this week"* | Performs deep contextual retrieval across the past 7 days to answer user questions with full historical context. |
+| **Cloud AI Setup & Fallback** | *"Connect cloud api"*, *"Setup cloud api"*, *"Set cloud api key <key>"*, *"Set cloud model <model>"* | Proactive onboarding when offline; seamlessly connects OpenAI, OpenRouter, Groq, or Anthropic models with key masking. |
+| **AI Provider Status** | *"Cloud status"*, *"Check cloud api"*, *"AI provider status"* | Displays health and active routing modes (local Ollama, cloud API, or hybrid). |
+| **Autonomous Agent Demos** | *"Demo 1"*, *"Demo 2"*, *"Demo 3"*, *"Demo 4"* | Triggers competition-ready multi-agent workflows (Linux diagnostics, TDD, research, permission gating). |
 | **Shutdown** | *"Hey VOID terminate code 0"* | Gracefully closes VOID and shuts down the assistant process. |
 
 ---

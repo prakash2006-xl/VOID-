@@ -16,7 +16,7 @@ from agentic.types import (
     RecoveryAction,
 )
 from agentic.permissions import PermissionManager
-from agentic.providers import AIProviderManager
+from agentic.providers import AIProviderManager, parse_cloud_credentials
 from agentic.tools import ToolRegistry
 from agentic.planner import PlannerAgent
 from agentic.orchestrator import MultiAgentOrchestrator
@@ -39,6 +39,7 @@ __all__ = [
     "RecoveryAction",
     "PermissionManager",
     "AIProviderManager",
+    "parse_cloud_credentials",
     "ToolRegistry",
     "PlannerAgent",
     "MultiAgentOrchestrator",

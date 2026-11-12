@@ -60,7 +60,7 @@ try:
     if _void_pkg_root not in sys.path:
         sys.path.insert(0, _void_pkg_root)
     from agentic import (
-        SupervisorAgent, ToolRegistry, AIProviderManager, PermissionManager,
+        SupervisorAgent, ToolRegistry, AIProviderManager, parse_cloud_credentials, PermissionManager,
         AgentMemoryManager, AuditLogger, CompetitionDemos, AgentActivityCard,
         WorkflowLifecycleState, TaskStatus
     )
@@ -3797,12 +3797,35 @@ class AudioVoiceEngine(QObject):
                 or any(q_lower.startswith(f"{v} ") for v in NEW_CMD_VERBS)
                 or any(p in q_lower for p in ["open ", "close ", "draft ", "create ", "search ", "what is", "take screenshot", "start ollama", "hey void"])
             )
-            if is_new_cmd and "@" not in q_clean:
+            is_cloud_input = (p_action.get("type") == "cloud_setup" and any(k in q_lower for k in ["sk-", "key", "model", "gpt", "claude", "gemini", "llama", "deepseek", "api", "open", "cloud"]))
+            if is_new_cmd and "@" not in q_clean and not is_cloud_input:
                 print(f"[VOID Action] Discarding stale pending action ({p_action.get('type')}) because new command intent was initiated: '{q_clean}'", flush=True)
                 self._pending_action = None
             else:
                 p_type = p_action.get("type")
-                if p_type in ["email_recipient", "recipient_email"]:
+                if p_type == "cloud_setup":
+                    model, key, base = parse_cloud_credentials(q_clean)
+                    if not key:
+                        toks = q_clean.strip().split()
+                        for t in toks:
+                            if t.startswith("sk-") or len(t) >= 16:
+                                key = t
+                                break
+                    if key:
+                        self._pending_action = None
+                        if hasattr(self, "_agent_providers") and self._agent_providers:
+                            cfg_res = self._agent_providers.configure_cloud(api_key=key, model=model, api_base=base)
+                            msg = f"Cloud AI connected successfully using model {cfg_res['model']} and API key {cfg_res['masked_key']}. Mode set to cloud."
+                        else:
+                            msg = f"Cloud AI configured with model {model}."
+                        orig = p_action.get("original_query", "")
+                        if orig and orig != q_clean:
+                            msg += f" Resuming original request: '{orig}'."
+                        return (msg, f"Cloud: Configured ({model})", "")
+                    else:
+                        return ("Could not detect a valid API key. Please provide your API key (starting with sk-) and model name, or say cancel.", "Prompt: Cloud API Key", "")
+
+                elif p_type in ["email_recipient", "recipient_email"]:
                     norm_email = (
                         q_clean.strip()
                         .replace(" at ", "@")
@@ -3851,6 +3874,54 @@ class AudioVoiceEngine(QObject):
                 "Memory: Status",
                 ""
             )
+
+        # 0c1. 7-Day High Memory & Weekly Digest Commands
+        if any(p in q_lower for p in ["generate weekly memory", "save weekly memory", "create weekly memory", "synthesize weekly memory", "create weekly memory file"]):
+            if hasattr(self, "_supervisor") and self._supervisor:
+                res = self._supervisor.execute_goal(q_clean)
+                return (res.get("summary_text", "Weekly memory file generated."), "Memory: Weekly File", res.get("artifacts", [""])[0] if res.get("artifacts") else "")
+            elif hasattr(self, "_agent_memory") and self._agent_memory:
+                path = self._agent_memory.generate_weekly_memory_file()
+                episodes = self._agent_memory.get_7day_episodes()
+                return (f"Weekly memory file generated at {path} synthesizing {len(episodes)} episodes across the past 7 days.", "Memory: Weekly File", path)
+
+        if any(p in q_lower for p in ["what did we do this week", "weekly recap", "recall this week", "recall from this week", "search weekly memory"]):
+            if hasattr(self, "_supervisor") and self._supervisor:
+                res = self._supervisor.execute_goal(q_clean)
+                return (res.get("summary_text", "Recalled weekly memory."), "Memory: Weekly Recap", "")
+            elif hasattr(self, "_agent_memory") and self._agent_memory:
+                q_res = self._agent_memory.query_weekly_memory(q_clean)
+                return (q_res["answer"], "Memory: Weekly Recap", "")
+
+        # 0c2. Cloud AI Onboarding & Provider Management Commands
+        if any(p in q_lower for p in ["connect cloud api", "setup cloud api", "configure cloud api", "configure cloud", "setup cloud"]):
+            model, key, base = parse_cloud_credentials(q_clean)
+            if key:
+                if hasattr(self, "_agent_providers") and self._agent_providers:
+                    cfg_res = self._agent_providers.configure_cloud(api_key=key, model=model, api_base=base)
+                    return (f"Cloud AI configured with model {cfg_res['model']} and API key {cfg_res['masked_key']}.", f"Cloud: {model}", "")
+            self._pending_action = {"type": "cloud_setup", "stage": "input"}
+            return ("Please provide your cloud AI model name and API key to connect.", "Prompt: Cloud Setup", "")
+
+        if q_lower.startswith("set cloud api key") or q_lower.startswith("set cloud key"):
+            raw_key = q_clean.split("key", 1)[1].strip(" :=`\"'")
+            if raw_key and hasattr(self, "_agent_providers") and self._agent_providers:
+                curr_model = getattr(self._agent_providers.cloud_provider, "model", "gpt-4o-mini") if self._agent_providers.cloud_provider else "gpt-4o-mini"
+                res = self._agent_providers.configure_cloud(api_key=raw_key, model=curr_model)
+                return (f"Cloud API key updated ({res['masked_key']}).", "Cloud: Key Configured", "")
+
+        if q_lower.startswith("set cloud model"):
+            raw_model = q_clean.split("model", 1)[1].strip(" :=`\"'")
+            if raw_model and hasattr(self, "_agent_providers") and self._agent_providers:
+                curr_key = getattr(self._agent_providers.cloud_provider, "api_key", "") if self._agent_providers.cloud_provider else ""
+                res = self._agent_providers.configure_cloud(api_key=curr_key, model=raw_model)
+                return (f"Cloud AI model set to {raw_model}.", f"Cloud: Model {raw_model}", "")
+
+        if any(p in q_lower for p in ["cloud status", "check cloud api", "ai provider status", "check ai status", "provider status"]):
+            loc_status = "Online" if (hasattr(self, "_agent_providers") and self._agent_providers and self._agent_providers.is_local_online()) else "Offline"
+            cloud_status = f"Configured ({self._agent_providers.cloud_provider.model})" if (hasattr(self, "_agent_providers") and self._agent_providers and self._agent_providers.is_cloud_configured()) else "Not configured"
+            mode = self._agent_providers.mode if hasattr(self, "_agent_providers") and self._agent_providers else "local"
+            return (f"Local Ollama: {loc_status}. Cloud AI: {cloud_status}. Active mode: {mode}.", "AI Status", "")
 
         # 0d. Ollama Brain Lifecycle & Speech-to-Text Initialization Fast-Path
         if any(p in q_lower for p in [
@@ -4823,9 +4894,50 @@ class AudioVoiceEngine(QObject):
             except Exception as e:
                 reply_text = f"Could not process: {e}"
                 action_badge = "Brain Error"
+        elif hasattr(self, "_agent_providers") and self._agent_providers and self._agent_providers.is_cloud_configured():
+            try:
+                system_msg = (
+                    "You are VOID, the personal autonomous AI desktop assistant on Fedora Linux KDE Plasma. "
+                    f"Context & Preferences: {self.memory.get_context_summary()}\n"
+                    "Provide a direct, concise, and helpful response."
+                )
+                cloud_reply = self._agent_providers.cloud_provider.generate(
+                    prompt=query,
+                    system=system_msg,
+                    temperature=0.3,
+                    max_tokens=512
+                )
+                if cloud_reply:
+                    reply_text = cloud_reply
+                    action_badge = f"Cloud AI: {self._agent_providers.cloud_provider.model}"
+                else:
+                    reply_text = "Received empty response from cloud provider."
+                    action_badge = "Cloud AI: Empty"
+            except Exception as e:
+                reply_text = f"Cloud AI error: {e}"
+                action_badge = "Cloud Error"
         else:
-            reply_text = "My AI brain is currently sleeping on standby to preserve power. Say 'Hey VOID, start ollama' to activate it, or ask me for desktop tasks, window controls, apps, math, and timers."
-            action_badge = "Brain: Standby"
+            self._pending_action = {
+                "type": "cloud_setup",
+                "stage": "input",
+                "original_query": query
+            }
+            reply_text = "Local Ollama is offline. Would you like to connect a cloud AI model? Please provide your model name and API key."
+            action_badge = "Prompt: Cloud Setup"
+
+        # High Memory Thought recording for 7-day rolling retention
+        if reply_text and hasattr(self, "_agent_memory") and self._agent_memory:
+            try:
+                self._agent_memory.record_high_memory_thought(
+                    query=query,
+                    thought_summary=reply_text,
+                    plan_id="",
+                    outcome="completed",
+                    artifacts=[thumbnail_path] if thumbnail_path else [],
+                    tags=["conversation", action_badge.lower()]
+                )
+            except Exception:
+                pass
 
         return (reply_text, action_badge, thumbnail_path)
 

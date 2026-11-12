@@ -38,6 +38,8 @@ class SupervisorAgent(BaseAgent):
         "unit test", "fix bug", "research and write", "executive summary",
         "multi-agent", "agentic", "compile report", "system audit",
         "demo 1", "demo 2", "demo 3", "demo 4", "verify code",
+        "weekly memory", "weekly summary", "this week", "weekly recap",
+        "recall this week", "what did we do this week", "cloud api", "setup cloud",
     ]
 
     # Explicit direct commands that must always remain in the sub-5ms fast path
@@ -110,26 +112,74 @@ class SupervisorAgent(BaseAgent):
         """
         Executes a high-level user goal using the full Multi-Agent pipeline:
         Planner -> Orchestrator -> Specialized Agents -> Verifier -> Memory & Audit.
+        Supports 7-day high-memory thought synthesis, weekly digests, and historical recall.
         """
         start_time = time.time()
+        g_lower = goal.lower().strip()
+
+        # 1. Weekly Memory Digest Generation Fast-Path
+        if any(kw in g_lower for kw in ("generate weekly memory", "create weekly memory", "save weekly memory", "weekly memory file", "synthesize weekly memory")):
+            digest_path = self.memory_mgr.generate_weekly_memory_file()
+            episodes = self.memory_mgr.get_7day_episodes()
+            summary = (
+                f"Weekly memory file generated successfully at {digest_path}. "
+                f"Synthesized {len(episodes)} thought traces and actions across the past 7 days."
+            )
+            self.audit_logger.log_event("WEEKLY_MEMORY_GENERATED", self.name, details={"path": digest_path, "episodes": len(episodes)})
+            return {
+                "plan_id": f"plan_weekly_{int(time.time())}",
+                "goal": goal,
+                "state": "completed",
+                "success": True,
+                "summary_text": summary,
+                "artifacts": [digest_path],
+                "tasks_completed": 1,
+                "total_tasks": 1,
+                "duration_sec": 0.05,
+            }
+
+        # 2. Weekly Memory Deep Retrieval & Answering Fast-Path
+        if any(kw in g_lower for kw in ("what did we do this week", "weekly recap", "recall this week", "recall from this week", "search weekly memory")):
+            query_res = self.memory_mgr.query_weekly_memory(goal)
+            self.audit_logger.log_event("WEEKLY_MEMORY_RECALLED", self.name, details={"matches": query_res["match_count"]})
+            return {
+                "plan_id": f"plan_recall_{int(time.time())}",
+                "goal": goal,
+                "state": "completed",
+                "success": True,
+                "summary_text": query_res["answer"],
+                "artifacts": query_res["artifacts"],
+                "tasks_completed": 1,
+                "total_tasks": 1,
+                "duration_sec": 0.05,
+            }
+
         self.audit_logger.log_event("WORKFLOW_START", self.name, details={"goal": goal})
 
-        # 1. Generate plan via PlannerAgent
+        # 3. Standard Multi-Agent DAG Generation & Execution
         plan = self.orchestrator.planner.create_plan(goal, context)
         self.audit_logger.log_event("PLAN_CREATED", "PlannerAgent", details={"plan_id": plan.plan_id, "tasks": len(plan.tasks)})
 
-        # 2. Execute plan via MultiAgentOrchestrator
         completed_plan = self.orchestrator.execute_plan(plan, context)
         duration = round(time.time() - start_time, 3)
 
-        # 3. Record task memory and workflow history
+        # 4. Record task memory, workflow history, and High Memory Thought
         for task in completed_plan.tasks:
             self.memory_mgr.save_task(task)
 
         self.memory_mgr.record_workflow_completion(completed_plan)
 
-        # 4. Synthesize final speech & text response
         synthesis = self._synthesize_summary(completed_plan, duration)
+
+        # High Memory Thought episode retention (7-day rolling window)
+        self.memory_mgr.record_high_memory_thought(
+            query=goal,
+            thought_summary=synthesis["summary_text"],
+            plan_id=completed_plan.plan_id,
+            outcome=completed_plan.state.value if hasattr(completed_plan.state, "value") else str(completed_plan.state),
+            artifacts=synthesis["artifacts"],
+            tags=["workflow", "multi-agent"]
+        )
 
         self.audit_logger.log_event(
             "WORKFLOW_END",
