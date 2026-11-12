@@ -27,6 +27,9 @@ class LinuxIntelligenceAgent(BaseAgent):
         )
 
     def _execute(self, task: AgentTask, context: Dict[str, Any]) -> ToolResult:
+        if task.tool_name and self.tools.has_tool(task.tool_name) and task.tool_name not in ("linux_diagnostic", "full_audit"):
+            return self.tools.execute(task.tool_name, task.tool_args)
+
         subcommand = task.tool_args.get("action", "diagnose")
 
         if subcommand == "metrics":

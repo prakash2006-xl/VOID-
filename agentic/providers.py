@@ -160,12 +160,15 @@ class CloudOpenAICompatibleProvider(BaseAIProvider):
             return {"online": False, "error": str(e), "latency_ms": round((time.time() - t0) * 1000, 1)}
 
 class AIProviderManager:
-    """Manages AI provider routing (local, cloud, hybrid)."""
+    """Manages multi-profile AI provider routing, per-agent assignments, and local/cloud fallback."""
 
     def __init__(self, mode: str = "local") -> None:
         self.mode = mode  # "local", "cloud", "hybrid"
         self.local_provider = LocalOllamaProvider()
         self.cloud_provider: Optional[CloudOpenAICompatibleProvider] = None
+        self.profiles: dict[str, dict[str, Any]] = {}
+        self.agent_model_assignments: dict[str, dict[str, str]] = {}
+        self._provider_cache: dict[str, BaseAIProvider] = {}
         self._load_config()
 
     def _load_config(self) -> None:
@@ -179,29 +182,109 @@ class AIProviderManager:
                     self.cloud_provider = CloudOpenAICompatibleProvider(
                         api_base=cloud_cfg.get("api_base", "https://api.openai.com/v1"),
                         api_key=cloud_cfg.get("api_key", ""),
-                        model=cloud_cfg.get("model", "gpt-4o-mini")
+                        model=cloud_cfg.get("model", "gpt-4o")
                     )
+
+                self.profiles = data.get("profiles", {})
+                self.agent_model_assignments = data.get("agent_model_assignments", {})
             except Exception:
                 pass
 
-    def save_cloud_config(self, api_base: str, api_key: str, model: str, enabled: bool = True) -> None:
-        """Saves cloud configuration safely to config."""
+    def get_provider_for_agent(self, agent_role: Any) -> BaseAIProvider:
+        """Resolves the designated provider and model for a specific agent role."""
+        role_key = agent_role.value if hasattr(agent_role, "value") else str(agent_role).lower()
+
+        # If in strict local mode, always use local provider
+        if self.mode == "local":
+            return self.local_provider
+
+        assignment = self.agent_model_assignments.get(role_key)
+        if not assignment:
+            # Fallback based on general routing
+            return self.route_provider(role_key)
+
+        profile_key = assignment.get("profile", "ollama_local")
+        model_name = assignment.get("model", "")
+
+        cache_key = f"{profile_key}:{model_name}"
+        if cache_key in self._provider_cache:
+            return self._provider_cache[cache_key]
+
+        profile = self.profiles.get(profile_key)
+        if not profile or not profile.get("enabled", True):
+            return self.local_provider
+
+        api_base = profile.get("api_base", "http://127.0.0.1:11434")
+        api_key = profile.get("api_key", "")
+        model = model_name or profile.get("default_model", "lfm3-omni:2b")
+
+        if "127.0.0.1" in api_base or "localhost" in api_base:
+            prov = LocalOllamaProvider(base_url=api_base, model=model)
+        else:
+            if not api_key:
+                return self.local_provider
+            prov = CloudOpenAICompatibleProvider(api_base=api_base, api_key=api_key, model=model)
+
+        self._provider_cache[cache_key] = prov
+        return prov
+
+    def set_agent_model(self, agent_role: str, profile_name: str, model_name: str) -> bool:
+        """Dynamically reassigns an agent role to a specific profile and model."""
+        role_key = agent_role.lower().strip()
+        self.agent_model_assignments[role_key] = {
+            "profile": profile_name,
+            "model": model_name
+        }
+        self._provider_cache.clear()
+        self._save_full_config()
+        return True
+
+    def list_profiles(self) -> dict[str, Any]:
+        """Lists registered profiles with masked API keys for secure presentation."""
+        out = {}
+        for k, p in self.profiles.items():
+            key = p.get("api_key", "")
+            masked = f"{key[:3]}...{key[-4:]}" if len(key) > 8 else ("(none)" if not key else "******")
+            out[k] = {
+                "name": p.get("provider_name", k),
+                "api_base": p.get("api_base"),
+                "default_model": p.get("default_model"),
+                "masked_key": masked,
+                "enabled": p.get("enabled", True)
+            }
+        return out
+
+    def _save_full_config(self) -> None:
         cfg_path = Path("/run/media/prakash/TR_39/VOID/config/ai_providers.json")
         cfg_path.parent.mkdir(parents=True, exist_ok=True)
         data = {
             "mode": self.mode,
             "cloud": {
-                "enabled": enabled,
-                "api_base": api_base,
-                "api_key": api_key,
-                "model": model
-            }
+                "enabled": bool(self.cloud_provider),
+                "api_base": getattr(self.cloud_provider, "api_base", "https://api.openai.com/v1"),
+                "api_key": getattr(self.cloud_provider, "api_key", ""),
+                "model": getattr(self.cloud_provider, "model", "gpt-4o")
+            },
+            "profiles": self.profiles,
+            "agent_model_assignments": self.agent_model_assignments
         }
         cfg_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+    def save_cloud_config(self, api_base: str, api_key: str, model: str, enabled: bool = True) -> None:
+        """Saves cloud configuration safely to config."""
+        self.mode = "cloud" if enabled else "local"
         if enabled and api_key:
             self.cloud_provider = CloudOpenAICompatibleProvider(api_base, api_key, model)
+            self.profiles["active_cloud"] = {
+                "provider_name": "Active Cloud",
+                "api_base": api_base,
+                "api_key": api_key,
+                "default_model": model,
+                "enabled": True
+            }
         else:
             self.cloud_provider = None
+        self._save_full_config()
 
     def is_local_online(self) -> bool:
         """Checks if local Ollama daemon is currently responsive."""

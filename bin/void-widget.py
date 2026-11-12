@@ -62,6 +62,7 @@ try:
     from agentic import (
         SupervisorAgent, ToolRegistry, AIProviderManager, parse_cloud_credentials, PermissionManager,
         AgentMemoryManager, AuditLogger, CompetitionDemos, AgentActivityCard,
+        CompactExecutionPopup, SystemInfoPopup,
         WorkflowLifecycleState, TaskStatus
     )
 except ImportError as e:
@@ -3010,11 +3011,24 @@ class AudioVoiceEngine(QObject):
                 on_state_change=self._on_agentic_state_change,
             )
             self._demos = CompetitionDemos(self._supervisor)
+            try:
+                from PySide6.QtWidgets import QApplication
+                if QApplication.instance() is not None:
+                    self._exec_popup = CompactExecutionPopup()
+                    self._sysinfo_popup = SystemInfoPopup()
+                else:
+                    self._exec_popup = None
+                    self._sysinfo_popup = None
+            except Exception:
+                self._exec_popup = None
+                self._sysinfo_popup = None
             print('[VOID Agentic] Multi-Agent Supervisor initialized successfully.', flush=True)
         except Exception as _e:
             print(f'[VOID Agentic Warning] Multi-Agent initialization skipped: {_e}', flush=True)
             self._supervisor = None
             self._demos = None
+            self._exec_popup = None
+            self._sysinfo_popup = None
 
         # Record initial baseline audio & screen levels without modifying user hardware
         try:
@@ -3588,6 +3602,11 @@ class AudioVoiceEngine(QObject):
         elif state_val == 'completed':
             self.state_changed.emit('celebrate')
         self.agentic_update.emit(state, plan, current_task)
+        if hasattr(self, '_exec_popup') and self._exec_popup:
+            try:
+                self._exec_popup.update_execution(state, plan, current_task)
+            except Exception:
+                pass
 
     def _handle_agentic_response(self, query: str, summary_text: str, result_dict: dict[str, Any]) -> None:
         state_name = result_dict.get('state', 'COMPLETED')
@@ -4716,15 +4735,31 @@ class AudioVoiceEngine(QObject):
             w_res = self.tool_hub.get_weather()
             return (f"Current weather: {w_res}", "Weather: Local", "")
 
-        # 5f. Hardware & Battery Vitals (upower + sensors)
-        if any(p in q_lower for p in ["hardware vitals", "battery status", "check battery", "how much battery", "cpu temp", "cpu temperature", "temperatures", "hardware health", "battery level"]):
+        # 5f. Hardware & Battery Vitals & System Information Popup
+        if any(p in q_lower for p in [
+            "hardware vitals", "battery status", "check battery", "how much battery",
+            "cpu temp", "cpu temperature", "temperatures", "hardware health", "battery level",
+            "ram usage", "system info", "system status", "system vitals", "check ram",
+            "show ram", "show my ram", "cpu usage", "show cpu"
+        ]):
+            if hasattr(self, "_sysinfo_popup") and self._sysinfo_popup:
+                try:
+                    self._sysinfo_popup.refresh_metrics()
+                    self._sysinfo_popup.show()
+                except Exception:
+                    pass
             v = self.tool_hub.get_hardware_vitals()
+            import psutil
+            cpu = psutil.cpu_percent(interval=None)
+            mem = psutil.virtual_memory()
+            used_gb = round(mem.used / (1024**3), 1)
+            total_gb = round(mem.total / (1024**3), 1)
             msg = f"Battery: {v.get('battery_pct')}% ({v.get('battery_state')}). Temperatures: CPU {v.get('cpu_temp_c')}°C"
             if v.get('gpu_temp_c') is not None:
                 msg += f", GPU {v.get('gpu_temp_c')}°C"
             if v.get('nvme_temp_c') is not None:
                 msg += f", NVMe {v.get('nvme_temp_c')}°C"
-            msg += "."
+            msg += f". Telemetry: RAM usage is {mem.percent}% ({used_gb} of {total_gb} GB), CPU is {cpu}%."
             return (msg, "Hardware Vitals", "")
 
         # 5g. Quick Sticky Notes (~/Documents/Notes)
@@ -4945,20 +4980,26 @@ class AudioVoiceEngine(QObject):
         if not text:
             return ""
         s = text
-        # Strip raw model tool calling tags
+        # Strip code blocks and raw tool calling tags
+        s = re.sub(r"```[\s\S]*?```", "", s)
         s = re.sub(r"<tool_call>.*?</tool_call>", "", s, flags=re.DOTALL)
         s = re.sub(r"<function=[^>]+>", "", s)
         s = re.sub(r"<parameter=[^>]+>", "", s)
         s = re.sub(r"</?[a-zA-Z0-9_-]+>", "", s)
 
+        # Strip raw JSON dictionary syntax
+        s = re.sub(r"\{[^{}]*\}", "", s)
+
         # Clean tool names and technical identifiers to natural English words
         s = re.sub(r"\b([a-z]+)_([a-z]+)\b", r"\1 \2", s)
 
-        # Clean markdown symbols
+        # Clean markdown symbols, bullets, headers, tables
         s = re.sub(r"\*\*([^*]+)\*\*", r"\1", s)
         s = re.sub(r"\*([^*]+)\*", r"\1", s)
         s = re.sub(r"`([^`]+)`", r"\1", s)
         s = re.sub(r"^#+\s*", "", s, flags=re.MULTILINE)
+        s = re.sub(r"^\s*[-*•]\s*", "", s, flags=re.MULTILINE)
+        s = re.sub(r"\|[^\n]+\|", "", s)
 
         # Simplify URLs and raw filesystem paths
         s = re.sub(r"https?://\S+", "the link", s)
@@ -4966,11 +5007,18 @@ class AudioVoiceEngine(QObject):
 
         # Strip emojis and symbols
         s = re.sub(r"[\U00010000-\U0010ffff]", "", s)
-        s = re.sub(r"[⏱️🎧💭💬💙🎉💫☀️🌙🌤️➔✕●⏺⏹]", "", s)
+        s = re.sub(r"[⏱️🎧💭💬💙🎉💫☀️🌙🌤️➔✕●⏺⏹✅⚙️🔍🔄🛑🚫⚠️❌📊]", "", s)
 
         # Normalize whitespace and ensure a clean pause between sentences
         s = re.sub(r"\s+", " ", s).strip()
         s = re.sub(r"\?\s*", "? ", s)
+
+        # If response is long, extract the first 2 clear sentences for fluent, comprehensible speech
+        if len(s) > 200:
+            sentences = re.split(r"(?<=[.!?])\s+", s)
+            if len(sentences) > 2:
+                s = " ".join(sentences[:2]).strip()
+
         return s
 
     def _speak_text(self, text: str) -> None:
@@ -5522,7 +5570,27 @@ class VoidMiniWidget(QWidget):
         resp_head.addStretch()
         resp_layout.addLayout(resp_head)
 
-        self._resp_text = QLabel("Ready to assist you.", self._resp_frame)
+        # Response Area with subtle scrollbar to prevent text clipping
+        self._resp_scroll = QScrollArea(self._resp_frame)
+        self._resp_scroll.setWidgetResizable(True)
+        self._resp_scroll.setMaximumHeight(85)
+        self._resp_scroll.setStyleSheet("""
+            QScrollArea { border: none; background: transparent; }
+            QScrollBar:vertical {
+                border: none;
+                background: rgba(15, 23, 42, 0.35);
+                width: 5px;
+                border-radius: 2px;
+            }
+            QScrollBar::handle:vertical {
+                background: rgba(56, 189, 248, 0.45);
+                border-radius: 2px;
+                min-height: 15px;
+            }
+            QScrollBar::handle:vertical:hover { background: rgba(56, 189, 248, 0.8); }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
+        """)
+        self._resp_text = QLabel("Ready to assist you.", self._resp_scroll)
         self._resp_text.setWordWrap(True)
         self._resp_text.setStyleSheet("""
             QLabel {
@@ -5533,7 +5601,8 @@ class VoidMiniWidget(QWidget):
                 border: none;
             }
         """)
-        resp_layout.addWidget(self._resp_text)
+        self._resp_scroll.setWidget(self._resp_text)
+        resp_layout.addWidget(self._resp_scroll)
 
         # Screenshot Thumbnail Preview (if applicable)
         self._thumb_preview = QLabel(self._resp_frame)

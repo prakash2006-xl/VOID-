@@ -6,6 +6,7 @@ Package root providing agents, permissions, orchestrator, planner, supervisor, t
 from agentic.types import (
     AgentRole,
     TaskStatus,
+    VALID_TASK_TRANSITIONS,
     PermissionLevel,
     WorkflowLifecycleState,
     ToolResult,
@@ -24,11 +25,12 @@ from agentic.supervisor import SupervisorAgent
 from agentic.memory import AgentMemoryManager
 from agentic.audit import AuditLogger
 from agentic.demos import CompetitionDemos
-from agentic.ui_components import AgentActivityCard
+from agentic.ui_components import AgentActivityCard, CompactExecutionPopup, SystemInfoPopup
 
 __all__ = [
     "AgentRole",
     "TaskStatus",
+    "VALID_TASK_TRANSITIONS",
     "PermissionLevel",
     "WorkflowLifecycleState",
     "ToolResult",
@@ -48,4 +50,6 @@ __all__ = [
     "AuditLogger",
     "CompetitionDemos",
     "AgentActivityCard",
+    "CompactExecutionPopup",
+    "SystemInfoPopup",
 ]

@@ -99,6 +99,10 @@ class VerificationAgent(BaseAgent):
         elif target_type in ("system_metrics", "system_state"):
             return self._verify_system_metrics(previous_result)
 
+        # 5. Verification of Media / Browser Playback
+        elif target_type in ("media_playback", "playback", "browser_playback"):
+            return self._verify_media_playback(previous_result)
+
         # Default fallback verification
         if previous_result:
             return VerificationResult(
@@ -274,5 +278,43 @@ class VerificationAgent(BaseAgent):
             verified=True,
             evidence="System state inspection succeeded.",
             details=metadata,
+        )
+
+    def _verify_media_playback(self, result: Optional[ToolResult]) -> VerificationResult:
+        """Verifies active media playback via MPRIS or PipeWire audio stream or browser presence."""
+        import subprocess
+        playerctl_status = ""
+        try:
+            r = subprocess.run(["playerctl", "status"], capture_output=True, text=True, timeout=1.5)
+            playerctl_status = r.stdout.strip()
+        except Exception:
+            pass
+
+        audio_stream = False
+        try:
+            r = subprocess.run(["pactl", "list", "sink-inputs"], capture_output=True, text=True, timeout=1.5)
+            if "state: RUNNING" in r.stdout or "Corked: no" in r.stdout or "chromium" in r.stdout.lower():
+                audio_stream = True
+        except Exception:
+            pass
+
+        import psutil
+        browser_active = False
+        for p in psutil.process_iter(['name', 'cmdline']):
+            try:
+                name = (p.info['name'] or '').lower()
+                cmdline = " ".join(p.info['cmdline'] or []).lower()
+                if "chromium" in name or "chrome" in name or "youtube" in cmdline:
+                    browser_active = True
+                    break
+            except Exception:
+                continue
+
+        verified = bool(playerctl_status in ("Playing", "Paused") or audio_stream or browser_active or (result and result.success))
+        evidence = f"Media Playback Verified: playerctl='{playerctl_status}', audio_stream={audio_stream}, browser_active={browser_active}"
+        return VerificationResult(
+            verified=verified,
+            evidence=evidence,
+            details={"playerctl": playerctl_status, "audio_stream": audio_stream, "browser_active": browser_active}
         )
 

@@ -113,7 +113,7 @@ class MultiAgentOrchestrator:
             all_completed = True
 
             for task in plan.tasks:
-                if task.status in (TaskStatus.PENDING, TaskStatus.READY):
+                if task.status in (TaskStatus.CREATED, TaskStatus.PENDING, TaskStatus.READY, TaskStatus.WAITING_FOR_DEPENDENCY):
                     # Check if all dependencies are satisfied
                     deps_satisfied = True
                     for dep_id in task.depends_on:
@@ -123,15 +123,21 @@ class MultiAgentOrchestrator:
                             break
 
                     if deps_satisfied:
+                        task.transition_to(TaskStatus.READY)
                         ready_task = task
                         all_completed = False
                         break
                     else:
+                        task.transition_to(TaskStatus.WAITING_FOR_DEPENDENCY)
                         all_completed = False
 
-                elif task.status in (TaskStatus.IN_PROGRESS, TaskStatus.WAITING_APPROVAL):
+                elif task.status in (
+                    TaskStatus.RUNNING, TaskStatus.IN_PROGRESS,
+                    TaskStatus.WAITING_APPROVAL, TaskStatus.WAITING_FOR_APPROVAL,
+                    TaskStatus.VERIFYING, TaskStatus.RETRYING, TaskStatus.RECOVERING
+                ):
                     all_completed = False
-                elif task.status == TaskStatus.FAILED:
+                elif task.status in (TaskStatus.FAILED, TaskStatus.TIMED_OUT, TaskStatus.BLOCKED, TaskStatus.CANCELLED):
                     all_completed = False
 
             if all_completed:
@@ -168,7 +174,7 @@ class MultiAgentOrchestrator:
         """Executes an individual task with telemetry, lifecycle notification, and artifact wiring."""
         agent = self._agents.get(task.assigned_agent)
         if not agent:
-            task.status = TaskStatus.FAILED
+            task.transition_to(TaskStatus.FAILED)
             task.error = f"No agent registered for role: {task.assigned_agent}"
             return False
 
@@ -187,8 +193,8 @@ class MultiAgentOrchestrator:
                 arguments=task.tool_args,
                 description=task.description,
             )
-            # If not yet approved, put task in WAITING_APPROVAL
-            task.status = TaskStatus.WAITING_APPROVAL
+            # If not yet approved, put task in WAITING_FOR_APPROVAL
+            task.transition_to(TaskStatus.WAITING_FOR_APPROVAL)
             plan.state = WorkflowLifecycleState.WAITING_APPROVAL
             self._notify_state(WorkflowLifecycleState.WAITING_APPROVAL, plan, task)
             return False
@@ -220,23 +226,26 @@ class MultiAgentOrchestrator:
         if rec_action.action_type == "RETRY":
             if rec_action.new_task_params:
                 task.tool_args.update(rec_action.new_task_params)
-            task.status = TaskStatus.PENDING
+            task.transition_to(TaskStatus.RETRYING)
+            task.transition_to(TaskStatus.READY)
             task.error = None
             return True
 
         elif rec_action.action_type == "REQUEST_APPROVAL":
-            task.status = TaskStatus.WAITING_APPROVAL
+            task.transition_to(TaskStatus.WAITING_FOR_APPROVAL)
             plan.state = WorkflowLifecycleState.WAITING_APPROVAL
             self._notify_state(WorkflowLifecycleState.WAITING_APPROVAL, plan, task)
             return False
 
         elif rec_action.action_type == "REPLAN":
+            task.transition_to(TaskStatus.RECOVERING)
             self._notify_state(WorkflowLifecycleState.PLANNING, plan, task)
             self.planner.replan(plan, task, rec_action.reason)
             return True
 
         elif rec_action.action_type == "ABORT":
-            task.status = TaskStatus.FAILED
+            task.transition_to(TaskStatus.FAILED)
+            return False
             return False
 
         return False

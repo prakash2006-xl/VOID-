@@ -28,17 +28,90 @@ class AgentRole(str, Enum):
 
 
 class TaskStatus(str, Enum):
-    PENDING = "pending"
+    # 18 Canonical States for Autonomous Agentic Execution
+    CREATED = "created"
+    ANALYZING = "analyzing"
     PLANNING = "planning"
+    PLAN_VALIDATING = "plan_validating"
     READY = "ready"
     RUNNING = "running"
-    IN_PROGRESS = "running"
-    WAITING_APPROVAL = "waiting_approval"
+    WAITING_FOR_DEPENDENCY = "waiting_for_dependency"
+    WAITING_FOR_USER = "waiting_for_user"
+    WAITING_FOR_APPROVAL = "waiting_for_approval"
     VERIFYING = "verifying"
+    RETRYING = "retrying"
+    RECOVERING = "recovering"
     COMPLETED = "completed"
+    PARTIALLY_COMPLETED = "partially_completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
-    RECOVERED = "recovered"
+    TIMED_OUT = "timed_out"
+    BLOCKED = "blocked"
+
+    # Backward Compatibility Aliases
+    PENDING = "created"
+    IN_PROGRESS = "running"
+    WAITING_APPROVAL = "waiting_for_approval"
+    RECOVERED = "completed"
+
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, str):
+            val_norm = value.strip().lower().replace(" ", "_").replace("-", "_")
+            mapping = {
+                "pending": cls.CREATED,
+                "in_progress": cls.RUNNING,
+                "executing": cls.RUNNING,
+                "waiting_approval": cls.WAITING_FOR_APPROVAL,
+                "approval_pending": cls.WAITING_FOR_APPROVAL,
+                "recovered": cls.COMPLETED,
+                "timeout": cls.TIMED_OUT,
+                "timedout": cls.TIMED_OUT,
+                "error": cls.FAILED,
+                "done": cls.COMPLETED,
+                "success": cls.COMPLETED,
+            }
+            if val_norm in mapping:
+                return mapping[val_norm]
+            for member in cls:
+                if member.value == val_norm or member.name.lower() == val_norm:
+                    return member
+        return None
+
+
+VALID_TASK_TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
+    TaskStatus.CREATED: {
+        TaskStatus.ANALYZING, TaskStatus.PLANNING, TaskStatus.READY,
+        TaskStatus.WAITING_FOR_DEPENDENCY, TaskStatus.BLOCKED, TaskStatus.CANCELLED
+    },
+    TaskStatus.ANALYZING: {TaskStatus.PLANNING, TaskStatus.READY, TaskStatus.FAILED, TaskStatus.CANCELLED},
+    TaskStatus.PLANNING: {TaskStatus.PLAN_VALIDATING, TaskStatus.READY, TaskStatus.FAILED, TaskStatus.CANCELLED},
+    TaskStatus.PLAN_VALIDATING: {TaskStatus.READY, TaskStatus.PLANNING, TaskStatus.FAILED, TaskStatus.CANCELLED},
+    TaskStatus.READY: {
+        TaskStatus.RUNNING, TaskStatus.WAITING_FOR_DEPENDENCY,
+        TaskStatus.WAITING_FOR_APPROVAL, TaskStatus.BLOCKED, TaskStatus.CANCELLED
+    },
+    TaskStatus.WAITING_FOR_DEPENDENCY: {TaskStatus.READY, TaskStatus.BLOCKED, TaskStatus.FAILED, TaskStatus.CANCELLED},
+    TaskStatus.WAITING_FOR_USER: {TaskStatus.RUNNING, TaskStatus.CANCELLED, TaskStatus.TIMED_OUT, TaskStatus.FAILED},
+    TaskStatus.WAITING_FOR_APPROVAL: {TaskStatus.RUNNING, TaskStatus.CANCELLED, TaskStatus.BLOCKED, TaskStatus.FAILED},
+    TaskStatus.RUNNING: {
+        TaskStatus.VERIFYING, TaskStatus.COMPLETED, TaskStatus.FAILED,
+        TaskStatus.RETRYING, TaskStatus.RECOVERING, TaskStatus.WAITING_FOR_USER,
+        TaskStatus.WAITING_FOR_APPROVAL, TaskStatus.TIMED_OUT, TaskStatus.CANCELLED
+    },
+    TaskStatus.VERIFYING: {
+        TaskStatus.COMPLETED, TaskStatus.PARTIALLY_COMPLETED,
+        TaskStatus.FAILED, TaskStatus.RETRYING, TaskStatus.RECOVERING
+    },
+    TaskStatus.RETRYING: {TaskStatus.RUNNING, TaskStatus.FAILED, TaskStatus.RECOVERING, TaskStatus.CANCELLED},
+    TaskStatus.RECOVERING: {TaskStatus.RUNNING, TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.BLOCKED, TaskStatus.CANCELLED},
+    TaskStatus.COMPLETED: set(),
+    TaskStatus.PARTIALLY_COMPLETED: set(),
+    TaskStatus.FAILED: {TaskStatus.RETRYING, TaskStatus.RECOVERING, TaskStatus.CREATED},
+    TaskStatus.CANCELLED: set(),
+    TaskStatus.TIMED_OUT: {TaskStatus.RETRYING, TaskStatus.RECOVERING, TaskStatus.FAILED},
+    TaskStatus.BLOCKED: {TaskStatus.READY, TaskStatus.CANCELLED, TaskStatus.FAILED},
+}
 
 
 class PermissionLevel(int, Enum):
@@ -186,7 +259,24 @@ class AgentTask:
             self.verification_result = self.verification
 
     def is_ready(self, completed_task_ids: set[str]) -> bool:
-        return self.status == TaskStatus.PENDING and all(dep in completed_task_ids for dep in self.depends_on)
+        return self.status in (TaskStatus.PENDING, TaskStatus.CREATED, TaskStatus.READY) and all(dep in completed_task_ids for dep in self.depends_on)
+
+    def transition_to(self, new_status: TaskStatus) -> bool:
+        """Transitions task to new status if transition is valid or forces if valid transition exists."""
+        if isinstance(new_status, str):
+            new_status = TaskStatus(new_status)
+        valid_targets = VALID_TASK_TRANSITIONS.get(self.status, set())
+        if new_status == self.status or new_status in valid_targets or not valid_targets:
+            self.status = new_status
+            if new_status == TaskStatus.RUNNING and not self.started_at:
+                self.started_at = time.time()
+            elif new_status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED, TaskStatus.PARTIALLY_COMPLETED):
+                self.completed_at = time.time()
+                if self.started_at:
+                    self.execution_time_sec = round(self.completed_at - self.started_at, 3)
+            return True
+        self.status = new_status
+        return True
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -234,6 +324,27 @@ class WorkflowPlan:
             if t.id == task_id or t.task_id == task_id:
                 return t
         return None
+
+    def compute_workflow_status(self) -> TaskStatus:
+        """Derives aggregate workflow status from task states."""
+        if not self.tasks:
+            return TaskStatus.COMPLETED
+        statuses = [t.status for t in self.tasks]
+        if all(s == TaskStatus.COMPLETED for s in statuses):
+            return TaskStatus.COMPLETED
+        if any(s in (TaskStatus.FAILED, TaskStatus.TIMED_OUT) for s in statuses):
+            if any(s == TaskStatus.COMPLETED for s in statuses):
+                return TaskStatus.PARTIALLY_COMPLETED
+            return TaskStatus.FAILED
+        if any(s == TaskStatus.CANCELLED for s in statuses):
+            return TaskStatus.CANCELLED
+        if any(s in (TaskStatus.WAITING_FOR_APPROVAL, TaskStatus.WAITING_FOR_USER) for s in statuses):
+            return TaskStatus.WAITING_FOR_APPROVAL
+        if any(s in (TaskStatus.RUNNING, TaskStatus.VERIFYING, TaskStatus.RETRYING, TaskStatus.RECOVERING) for s in statuses):
+            return TaskStatus.RUNNING
+        if any(s == TaskStatus.BLOCKED for s in statuses):
+            return TaskStatus.BLOCKED
+        return TaskStatus.READY
 
     def to_dict(self) -> dict[str, Any]:
         return {

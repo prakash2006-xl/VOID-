@@ -29,6 +29,9 @@ class ResearchProductivityAgent(BaseAgent):
         )
 
     def _execute(self, task: AgentTask, context: Dict[str, Any]) -> ToolResult:
+        if task.tool_name and self.tools.has_tool(task.tool_name) and task.tool_name not in ("conduct_research_and_report",):
+            return self.tools.execute(task.tool_name, task.tool_args)
+
         action = task.tool_args.get("action", "generate_report")
 
         if action == "generate_docx":

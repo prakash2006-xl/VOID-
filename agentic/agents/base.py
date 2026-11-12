@@ -46,7 +46,7 @@ class BaseAgent:
         Must be implemented by subclasses.
         """
         start_time = time.time()
-        task.status = TaskStatus.IN_PROGRESS
+        task.transition_to(TaskStatus.RUNNING)
         task.assigned_agent = self.role
 
         try:
@@ -55,9 +55,9 @@ class BaseAgent:
             task.result = result
 
             if result.success:
-                task.status = TaskStatus.COMPLETED
+                task.transition_to(TaskStatus.COMPLETED)
             else:
-                task.status = TaskStatus.FAILED
+                task.transition_to(TaskStatus.FAILED)
                 task.error = result.stderr or result.output
 
             self.history.append({

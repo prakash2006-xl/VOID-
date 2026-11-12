@@ -35,6 +35,9 @@ class DeveloperAgent(BaseAgent):
         )
 
     def _execute(self, task: AgentTask, context: Dict[str, Any]) -> ToolResult:
+        if task.tool_name and self.tools.has_tool(task.tool_name) and task.tool_name not in ("scaffold_project", "apply_code_fix"):
+            return self.tools.execute(task.tool_name, task.tool_args)
+
         action = task.tool_args.get("action", "run_tests")
 
         if action == "run_tests":
