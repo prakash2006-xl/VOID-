@@ -225,9 +225,31 @@ def test_5_web_research_comparison(supervisor: SupervisorAgent):
     print("  ✓ Complex Task 4 (Web Research DOCX) passed with 100% verification.")
 
 
-def test_6_productivity_notes_and_sheet(supervisor: SupervisorAgent):
-    log_test("6. Complex Task 5: Multi-Agent Productivity Workflow (Notes -> DOCX + XLSX)")
-    # Ensure sample notes exist
+def test_6_void_project_analysis(supervisor: SupervisorAgent):
+    log_test("6. Complex Task 5: Multi-Agent VOID Project Analysis & Development Report")
+    goal = "Analyze the VOID project, identify possible bugs and prepare a development improvement report"
+
+    res = supervisor.execute_goal(goal)
+    print(f"  Plan ID: {res['plan_id']}")
+    print(f"  Tasks Completed: {res['tasks_completed']}/{res['total_tasks']}")
+    print(f"  Summary: {res['summary_text']}")
+    print(f"  Artifacts: {res['artifacts']}")
+
+    assert res["total_tasks"] == 5, f"Expected 5 tasks, got {res['total_tasks']}"
+    assert res["tasks_completed"] == 5
+    assert res["success"] is True
+    assert len(res["artifacts"]) >= 1
+
+    report_path = res["artifacts"][0]
+    assert os.path.exists(report_path)
+    assert os.path.getsize(report_path) > 1000
+
+    print(f"  ✓ Verified Development Improvement Report DOCX: {report_path} ({os.path.getsize(report_path)} bytes)")
+    print("  ✓ Complex Task 5 (VOID Project Analysis) passed with 100% verification.")
+
+
+def test_7_productivity_notes_and_sheet(supervisor: SupervisorAgent):
+    log_test("7. Bonus Workflow: Multi-Agent Productivity Workflow (Notes -> DOCX + XLSX)")
     notes_dir = Path("/home/prakash/Documents/Notes")
     notes_dir.mkdir(parents=True, exist_ok=True)
     sample_note = notes_dir / "bootcamp_prep.md"
@@ -258,11 +280,11 @@ def test_6_productivity_notes_and_sheet(supervisor: SupervisorAgent):
 
     print(f"  ✓ Verified Executive Notes DOCX: {docx_path} ({os.path.getsize(docx_path)} bytes)")
     print(f"  ✓ Verified Action Items XLSX: {xlsx_path} ({os.path.getsize(xlsx_path)} bytes)")
-    print("  ✓ Complex Task 5 (Productivity Workflow) passed with 100% verification.")
+    print("  ✓ Productivity Workflow passed with 100% verification.")
 
 
-def test_7_multi_agent_cloud_config():
-    log_test("7. Multi-Agent Cloud Configuration & Secret Masking")
+def test_8_multi_agent_cloud_config():
+    log_test("8. Multi-Agent Cloud Configuration & Secret Masking")
     pm = AIProviderManager()
 
     # Verify profiles
@@ -298,8 +320,54 @@ def test_7_multi_agent_cloud_config():
     pm.set_agent_model("developer", "deepseek", "deepseek-coder")
 
 
-def test_8_ui_popups_and_speech():
-    log_test("8. UI Popups & Voice Cleaning Verification")
+def test_9_default_system_agent_fallback():
+    log_test("9. Mandatory Acceptance Test: Default System Agent Fallback (Simulated Total Outage)")
+    from agentic.providers import DefaultSystemProvider
+    from agentic.orchestrator import MultiAgentOrchestrator
+    from agentic.agents.system_agent import DefaultSystemAgent
+
+    pm = AIProviderManager()
+    # 1. Simulate all cloud providers being unavailable and local Ollama down
+    pm.profiles = {}
+    pm.agent_model_assignments = {}
+    pm.is_local_online = lambda: False
+
+    prov, tier_desc = pm.route_hierarchical(AgentRole.SUPERVISOR)
+    print(f"  Routing during total outage: {tier_desc}")
+    assert isinstance(prov, DefaultSystemProvider)
+    assert prov.name == "default-system-agent"
+    assert "Tier 4" in tier_desc
+
+    # 2. Test conversational response generation during total outage
+    resp = prov.generate("Hello VOID, what can you do?")
+    print(f"  Default System Agent response: '{resp}'")
+    assert "Default System Agent" in resp
+    assert len(resp) > 20
+
+    # 3. Test Orchestrator dispatching to Default System Agent
+    perm = PermissionManager()
+    tools = ToolRegistry(perm)
+    orch = MultiAgentOrchestrator(tools, pm, perm)
+
+    assert orch.system_agent is not None
+    assert isinstance(orch.system_agent, DefaultSystemAgent)
+
+    # 4. Dispatch a real system task through Default System Agent
+    task = AgentTask(
+        description="Read hardware metrics during total outage",
+        tool_name="get_system_metrics",
+        assigned_agent=AgentRole.DEFAULT_SYSTEM
+    )
+    result = orch.system_agent.run_task(task, {})
+    assert result.success is True
+    assert task.status == TaskStatus.COMPLETED
+    assert task.result is not None
+    print(f"  ✓ Task executed successfully by DefaultSystemAgent: success={result.success}, duration={task.execution_time_sec}s")
+    print("  ✓ Mandatory Acceptance Test for Default System Agent Fallback PASSED 100%.")
+
+
+def test_10_ui_popups_and_speech():
+    log_test("10. UI Popups & Voice Cleaning Verification")
 
     try:
         from PySide6.QtWidgets import QApplication
@@ -326,7 +394,6 @@ def test_8_ui_popups_and_speech():
     print("  ✓ SystemInfoPopup telemetry refresh executed cleanly.")
 
     # 3. Speech Cleaner & Fluency Enforcement
-    # Simulate widget cleaner
     import re
     def clean_text_for_speech(text: str) -> str:
         s = text
@@ -384,14 +451,16 @@ def main():
     test_3_system_performance_audit(supervisor)
     test_4_python_csv_project(supervisor)
     test_5_web_research_comparison(supervisor)
-    test_6_productivity_notes_and_sheet(supervisor)
+    test_6_void_project_analysis(supervisor)
+    test_7_productivity_notes_and_sheet(supervisor)
 
-    test_7_multi_agent_cloud_config()
-    test_8_ui_popups_and_speech()
+    test_8_multi_agent_cloud_config()
+    test_9_default_system_agent_fallback()
+    test_10_ui_popups_and_speech()
 
     duration = round(time.time() - t0, 2)
     print("\n" + "=" * 80)
-    print(f"  ✅ ALL 8 COMPLEX TEST SUITES PASSED FLAWLESSLY IN {duration}s")
+    print(f"  ✅ ALL 10 TEST SUITES (5 MANDATORY + 5 SYSTEM/UI) PASSED FLAWLESSLY IN {duration}s")
     print("  Zero errors, zero regressions, full multi-agent autonomous validation.")
     print("=" * 80)
 

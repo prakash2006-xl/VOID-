@@ -25,6 +25,8 @@ class AgentRole(str, Enum):
     TOOL_EXECUTION = "tool_exec"
     VERIFIER = "verifier"
     RECOVERY = "recovery"
+    SYSTEM = "system_agent"
+    DEFAULT_SYSTEM = "system_agent"
 
 
 class TaskStatus(str, Enum):

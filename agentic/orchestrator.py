@@ -24,6 +24,7 @@ from agentic.agents.research_agent import ResearchProductivityAgent
 from agentic.agents.tool_agent import ToolExecutionAgent
 from agentic.agents.verifier_agent import VerificationAgent
 from agentic.agents.recovery_agent import RecoveryAgent
+from agentic.agents.system_agent import DefaultSystemAgent
 from agentic.planner import PlannerAgent
 from agentic.permissions import PermissionManager
 from agentic.tools import ToolRegistry
@@ -58,6 +59,7 @@ class MultiAgentOrchestrator:
         self.tool_agent = ToolExecutionAgent(tools, provider_manager)
         self.verifier = VerificationAgent(tools, provider_manager)
         self.recovery = RecoveryAgent(tools, provider_manager)
+        self.system_agent = DefaultSystemAgent(tools, provider_manager)
 
         self._agents: Dict[AgentRole, BaseAgent] = {
             AgentRole.PLANNER: self.planner,
@@ -67,6 +69,8 @@ class MultiAgentOrchestrator:
             AgentRole.TOOL_EXECUTION: self.tool_agent,
             AgentRole.VERIFIER: self.verifier,
             AgentRole.RECOVERY: self.recovery,
+            AgentRole.DEFAULT_SYSTEM: self.system_agent,
+            AgentRole.SYSTEM: self.system_agent,
         }
 
         self.active_plan: Optional[WorkflowPlan] = None
@@ -174,9 +178,9 @@ class MultiAgentOrchestrator:
         """Executes an individual task with telemetry, lifecycle notification, and artifact wiring."""
         agent = self._agents.get(task.assigned_agent)
         if not agent:
-            task.transition_to(TaskStatus.FAILED)
-            task.error = f"No agent registered for role: {task.assigned_agent}"
-            return False
+            logger.warning(f"Unregistered agent role '{task.assigned_agent}' requested for task {task.task_id}. Re-routing to DefaultSystemAgent.")
+            agent = self.system_agent
+            task.assigned_agent = AgentRole.DEFAULT_SYSTEM
 
         # Prepare context inputs: auto-fill target_path for verifier from prior artifacts
         if task.assigned_agent == AgentRole.VERIFIER:
