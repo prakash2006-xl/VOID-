@@ -63,3 +63,4 @@ class DefaultSystemAgent(BaseAgent):
             execution_time_sec=duration / 1000.0,
             metadata={"agent": self.name, "fallback_tier": 4, "offline_mode": True},
         )
+

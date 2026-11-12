@@ -189,6 +189,46 @@ class ToolRegistry:
     execute = execute_tool
 
 
+def extract_media_song_query(text: str) -> str:
+    """
+    Robustly extracts the exact song/media query from natural language requests,
+    removing conversational noise, browser prefixes, and conjunctions.
+    """
+    s = text.strip()
+    s = re.sub(r"^(?:hey|hi|hello|ok|okay)?\s*(?:void|computer)?\s*[,:]?\s*", "", s, flags=re.I)
+    s = re.sub(r"^(?:please|can you|could you|i want to|kindly)\s+", "", s, flags=re.I)
+
+    # Complex multi-step instructions e.g. "search for X, open the correct result, play the song..."
+    m_complex = re.search(r"search\s+(?:for\s+)?(.+?)(?:,\s*open|\s+and\s+open|\s+and\s+play|\s+open\s+the|$)", s, re.I)
+    if m_complex:
+        candidate = m_complex.group(1).strip()
+        candidate = re.sub(r"\b(?:song|video|track|music|in\s+youtube|on\s+youtube)\b", "", candidate, flags=re.I).strip()
+        if candidate and len(candidate.split()) <= 8:
+            return candidate
+
+    patterns = [
+        r"(?:open\s+)?youtube(?:\s+in\s+chromium)?\s+(?:and\s+)?(?:play|search(?:\s+for)?)\s+(.+)",
+        r"(?:open\s+chromium\s+(?:and\s+)?(?:go\s+to\s+)?youtube\s+(?:and\s+)?(?:play|search(?:\s+for)?)\s+)(.+)",
+        r"play\s+(.+?)\s+(?:on|in)\s+youtube",
+        r"play\s+(.+?)\s+song(?:\s+(?:on|in)\s+youtube)?",
+        r"play\s+song\s+(.+)",
+        r"play\s+(.+)",
+        r"youtube\s+(?:play|search)\s+(.+)",
+    ]
+    for pat in patterns:
+        m = re.search(pat, s, re.I)
+        if m:
+            raw = m.group(1).strip()
+            clean = re.sub(r"\b(?:in\s+chromium|on\s+youtube|in\s+youtube|and\s+play(?:\s+it)?|play\s+it|and\s+confirm.*|the\s+song|song|video|track|music)\b", "", raw, flags=re.I).strip()
+            clean = re.sub(r"^(?:for|a|the|to|and)\s+", "", clean, flags=re.I).strip()
+            clean = re.sub(r"\s+", " ", clean).strip()
+            if clean:
+                return clean
+
+    clean = re.sub(r"\b(?:open|new|tab|in|chromium|youtube|play|song|video|track|please|can|you|and|for|a|the|to|me)\b", "", s, flags=re.I).strip()
+    return clean or "Top Music Hits"
+
+
 def _populate_default_tools(reg: ToolRegistry, perm_mgr: PermissionManager, tool_hub: Any = None) -> None:
     """Populates standard system, development, and productivity tools."""
 
@@ -521,10 +561,20 @@ def _populate_default_tools(reg: ToolRegistry, perm_mgr: PermissionManager, tool
 
     # 4. Media, Browser & System Automation Tools
     def _open_youtube_playback(query: str = "", song: str = "", track: str = "", browser: str = "chromium", **kwargs) -> dict[str, Any]:
-        target_query = query or song or track or "Believer"
-        clean_q = re.sub(r"\b(?:open|play|song|video|track|music|in\s+chromium|on\s+youtube)\b", "", target_query, flags=re.I).strip()
-        if not clean_q:
-            clean_q = target_query
+        raw_target = query or song or track or kwargs.get("goal", "")
+        clean_q = extract_media_song_query(raw_target) if raw_target else "Top Music Hits"
+        if not clean_q or clean_q in ["it", "something", "a song", "music", "song"]:
+            clean_q = "Top Music Hits"
+
+        # Pause any active players first to avoid audio overlap
+        try:
+            m_res = subprocess.run(["qdbus-qt6"], capture_output=True, text=True, timeout=1.0)
+            for l in m_res.stdout.splitlines():
+                if "org.mpris.MediaPlayer2" in l:
+                    subprocess.run(["qdbus-qt6", l.strip(), "/org/mpris/MediaPlayer2", "org.mpris.MediaPlayer2.Player.Pause"],
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=0.8)
+        except Exception:
+            pass
 
         chrom_bin = "/usr/bin/chromium-browser"
         if not os.path.exists(chrom_bin):

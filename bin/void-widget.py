@@ -1476,6 +1476,45 @@ def normalize_voice_intent(text: str) -> str:
         s = re.sub(pattern, rep, s, flags=re.I)
     return s.strip()
 
+def extract_media_song_query(text: str) -> str:
+    """
+    Robustly extracts the exact song/media query from natural language requests,
+    removing conversational noise, browser prefixes, and conjunctions.
+    """
+    s = text.strip()
+    s = re.sub(r"^(?:hey|hi|hello|ok|okay)?\s*(?:void|computer)?\s*[,:]?\s*", "", s, flags=re.I)
+    s = re.sub(r"^(?:please|can you|could you|i want to|kindly)\s+", "", s, flags=re.I)
+
+    # Complex multi-step instructions e.g. "search for X, open the correct result, play the song..."
+    m_complex = re.search(r"search\s+(?:for\s+)?(.+?)(?:,\s*open|\s+and\s+open|\s+and\s+play|\s+open\s+the|$)", s, re.I)
+    if m_complex:
+        candidate = m_complex.group(1).strip()
+        candidate = re.sub(r"\b(?:song|video|track|music|in\s+youtube|on\s+youtube)\b", "", candidate, flags=re.I).strip()
+        if candidate and len(candidate.split()) <= 8:
+            return candidate
+
+    patterns = [
+        r"(?:open\s+)?youtube(?:\s+in\s+chromium)?\s+(?:and\s+)?(?:play|search(?:\s+for)?)\s+(.+)",
+        r"(?:open\s+chromium\s+(?:and\s+)?(?:go\s+to\s+)?youtube\s+(?:and\s+)?(?:play|search(?:\s+for)?)\s+)(.+)",
+        r"play\s+(.+?)\s+(?:on|in)\s+youtube",
+        r"play\s+(.+?)\s+song(?:\s+(?:on|in)\s+youtube)?",
+        r"play\s+song\s+(.+)",
+        r"play\s+(.+)",
+        r"youtube\s+(?:play|search)\s+(.+)",
+    ]
+    for pat in patterns:
+        m = re.search(pat, s, re.I)
+        if m:
+            raw = m.group(1).strip()
+            clean = re.sub(r"\b(?:in\s+chromium|on\s+youtube|in\s+youtube|and\s+play(?:\s+it)?|play\s+it|and\s+confirm.*|the\s+song|song|video|track|music)\b", "", raw, flags=re.I).strip()
+            clean = re.sub(r"^(?:for|a|the|to|and)\s+", "", clean, flags=re.I).strip()
+            clean = re.sub(r"\s+", " ", clean).strip()
+            if clean:
+                return clean
+
+    clean = re.sub(r"\b(?:open|new|tab|in|chromium|youtube|play|song|video|track|please|can|you|and|for|a|the|to|me)\b", "", s, flags=re.I).strip()
+    return clean or "Top Music Hits"
+
 def split_compound_commands(query: str) -> list[str]:
     q = query.strip()
     parts = re.split(r"\s*(?:and\s+then|,\s*then|\s+then\s+|;)\s*", q, flags=re.I)
@@ -1484,6 +1523,7 @@ def split_compound_commands(query: str) -> list[str]:
 
     ACTION_VERBS = [
         "open", "launch", "start", "run", "spawn", "opn", "oepn",
+        "play", "pause", "resume",
         "close", "kill", "quit", "exit", "shut", "shutdown", "reboot", "restart", "lock",
         "minimize", "minimise", "maximize", "maximise", "fullscreen", "full screen", "show",
         "take", "capture", "grab", "screenshot", "screen shot",
@@ -1625,7 +1665,9 @@ class DodaiosToolHub:
                 except Exception as e:
                     return False, f"Failed to open video file: {e}", "Video Error", ""
             else:
-                clean_yt = re.sub(r"\b(?:open|play|video|song|movie|track|clip|in\s+chromium|on\s+youtube)\b", "", t_clean, flags=re.I).strip()
+                clean_yt = extract_media_song_query(t_clean)
+                if not clean_yt or clean_yt in ["it", "something", "a song", "music", "song"]:
+                    clean_yt = re.sub(r"\b(?:open|play|video|song|movie|track|clip|in\s+chromium|on\s+youtube)\b", "", t_clean, flags=re.I).strip()
                 if not clean_yt:
                     clean_yt = t_clean
                 ok, msg = self.play_youtube_query(clean_yt)
@@ -1700,9 +1742,22 @@ class DodaiosToolHub:
 
     def play_youtube_query(self, query: str) -> tuple[bool, str]:
         """Searches YouTube, resolves the top matching video ID, and directly plays it in Chromium."""
-        clean_q = re.sub(r"\b(?:song|video|track|music)\b", "", query, flags=re.I).strip()
+        clean_q = extract_media_song_query(query)
+        if not clean_q or clean_q in ["it", "something", "a song", "music", "song"]:
+            clean_q = re.sub(r"\b(?:song|video|track|music)\b", "", query, flags=re.I).strip() or query
+
+        # Pause any currently active media player first so old tracks don't continue playing
         try:
-            enc_q = urllib.parse.quote(query)
+            m_res = subprocess.run(["qdbus-qt6"], capture_output=True, text=True, timeout=1.0)
+            for l in m_res.stdout.splitlines():
+                if "org.mpris.MediaPlayer2" in l:
+                    subprocess.run(["qdbus-qt6", l.strip(), "/org/mpris/MediaPlayer2", "org.mpris.MediaPlayer2.Player.Pause"],
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=0.8)
+        except Exception:
+            pass
+
+        try:
+            enc_q = urllib.parse.quote(clean_q)
             search_url = f"https://www.youtube.com/results?search_query={enc_q}"
             req = urllib.request.Request(search_url, headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64)"})
             html = urllib.request.urlopen(req, timeout=3.5).read().decode("utf-8", errors="ignore")
@@ -1711,16 +1766,16 @@ class DodaiosToolHub:
                 vid_id = video_ids[0]
                 play_url = f"https://www.youtube.com/watch?v={vid_id}&autoplay=1"
                 subprocess.Popen([CHROMIUM_BIN, play_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-                return True, f"Opened YouTube in Chromium and playing '{query.title()}'."
+                return True, f"Opened YouTube in Chromium and playing '{clean_q.title()}'."
         except Exception as e:
             print(f"[YouTube Direct Play Error] {e}", flush=True)
 
         # Fallback: Open YouTube search results and schedule click on first result
-        enc_q = urllib.parse.quote(query)
+        enc_q = urllib.parse.quote(clean_q)
         search_url = f"https://www.youtube.com/results?search_query={enc_q}"
         subprocess.Popen([CHROMIUM_BIN, search_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
         threading.Thread(target=self._click_first_youtube_result_delayed, daemon=True).start()
-        return True, f"Opened YouTube in Chromium searching for '{query.title()}'. Playing top video result."
+        return True, f"Opened YouTube in Chromium searching for '{clean_q.title()}'. Playing top video result."
 
     def _click_first_youtube_result_delayed(self) -> None:
         try:
@@ -4214,7 +4269,28 @@ class AudioVoiceEngine(QObject):
             msg = self.tool_hub.browser_search(term)
             return (msg, f"Browser: Search '{term}'", "")
 
-        # 1b1. YouTube Search & Play (Direct Video Stream & Browser Playback)
+        # 1b1. YouTube Search & Play (Direct Video Stream & Browser Playback - Instant Fast Path)
+        is_mpris_transport = any(p in q_lower for p in [
+            "pause music", "pause playback", "pause song", "pause track", "pause media",
+            "play music", "resume music", "resume playback", "unpause music",
+            "next song", "next track", "skip song", "skip track", "next music",
+            "previous song", "prev song", "previous track", "prev track",
+            "stop music", "stop song", "stop playback"
+        ]) or q_lower.strip() in ["pause", "resume", "next", "previous", "stop"]
+
+        is_media_request = (
+            not is_mpris_transport and (
+                any(w in q_lower for w in ["youtube"]) or
+                re.search(r"\b(?:open\s+)?youtube(?:\s+in\s+chromium)?\s+(?:and\s+)?play\b", q_lower) or
+                bool(re.search(r"^(?:please\s+)?play\s+(?!music$|playback$)[a-zA-Z0-9_\-\s]+", q_lower))
+            )
+        )
+        if is_media_request and not any(k in q_lower for k in ["confirm playback has started", "verify playback has started"]):
+            extracted_song = extract_media_song_query(q_clean)
+            if extracted_song and extracted_song not in ["it", "something", "a song", "music", "song"]:
+                ok, msg = self.tool_hub.play_youtube_query(extracted_song)
+                return (msg, f"YouTube: Play ({extracted_song[:16]})", "")
+
         yt_play_match = (
             re.search(r"(?:open\s+)?youtube(?:\s+in\s+chromium)?\s+and\s+search(?:\s+for)?\s+(.+?)(?:\s+and\s+play(?:\s+it)?|$)", q_lower) or
             re.search(r"search(?:\s+for)?\s+(.+?)\s+on\s+youtube\s+and\s+play(?:\s+it)?", q_lower) or

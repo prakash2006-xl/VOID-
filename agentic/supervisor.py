@@ -7,6 +7,7 @@ orchestrates execution, records persistent memory, and synthesizes verifiable de
 
 import time
 import logging
+import re
 from typing import Dict, Any, List, Optional, Callable
 from agentic.types import (
     AgentRole,
@@ -32,21 +33,25 @@ class SupervisorAgent(BaseAgent):
     ensures safety boundaries, and delivers verifiable results.
     """
 
-    # Utterance keywords that strongly signal an agentic, multi-step workflow
+    # Utterance keywords that strongly signal an agentic, multi-step workflow requiring planning
     AGENTIC_KEYWORDS = [
         "investigate", "diagnostic", "diagnose", "bottleneck", "scaffold",
-        "unit test", "fix bug", "research and write", "executive summary",
-        "multi-agent", "agentic", "compile report", "system audit",
+        "unit test", "test suite", "fix bug", "research and write", "executive summary",
+        "multi-agent", "agentic", "compile report", "system audit", "performance audit",
         "demo 1", "demo 2", "demo 3", "demo 4", "verify code",
         "weekly memory", "weekly summary", "this week", "weekly recap",
         "recall this week", "what did we do this week", "cloud api", "setup cloud",
+        "data analysis project", "analyze dataset", "analyze csv",
+        "compare models", "model comparison", "benchmark", "comparison document",
+        "codebase audit", "analyze void", "improvement report", "roadmap report",
+        "confirm playback has started", "verify playback has started",
     ]
 
     # Explicit direct commands that must always remain in the sub-5ms fast path
     FAST_PATH_EXACT = [
         "volume up", "volume down", "mute", "unmute",
         "screen brighter", "screen dimmer", "cancel", "stop dictation",
-        "start ollama", "stop ollama",
+        "start ollama", "stop ollama", "pause", "resume", "next", "previous",
     ]
 
     def __init__(
@@ -78,30 +83,46 @@ class SupervisorAgent(BaseAgent):
     def classify_intent(self, text: str) -> Dict[str, Any]:
         """
         Determines whether the input is a deterministic fast-path or an agentic workflow.
-        Guarantees sub-millisecond classification overhead.
+        Strictly reserves AGENTIC_WORKFLOW for genuinely difficult multi-step tasks.
+        Guarantees sub-millisecond classification overhead (< 0.2ms) for maximum speed.
         """
         clean = text.strip().lower()
 
-        # 1. Exact match fast paths
+        # 1. Exact match direct commands (instant < 0.1ms)
         if clean in self.FAST_PATH_EXACT:
             return {"mode": "FAST_PATH", "reason": "Exact match direct hardware command"}
 
-        # 2. Hardware pattern match (e.g. "volume 50%", "brightness 80%")
-        if clean.startswith("volume ") or clean.startswith("brightness ") or clean.startswith("set volume"):
+        # 2. Hardware controls (volume, brightness, mute, vitals, machine health)
+        if clean.startswith("volume ") or clean.startswith("brightness ") or clean.startswith("set volume") or clean.startswith("screen "):
             return {"mode": "FAST_PATH", "reason": "Hardware direct command"}
 
-        # 3. Simple media / app launcher
-        if clean.startswith("open ") and len(clean.split()) <= 2:
-            return {"mode": "FAST_PATH", "reason": "Simple single app launch"}
+        # 3. Direct media / song playback (must execute instantly on fast path, NOT planning)
+        # Exception: Only route to AGENTIC if the user explicitly demands verified playback monitoring
+        is_media_command = (
+            clean.startswith("play ") or
+            "play song" in clean or
+            "play video" in clean or
+            re.search(r"\b(?:open\s+)?youtube(?:\s+in\s+chromium)?\s+(?:and\s+)?(?:play|search)\b", clean)
+        )
+        has_explicit_verification = any(k in clean for k in ("confirm playback has started", "verify playback has started", "verify that playback"))
+        if is_media_command and not has_explicit_verification:
+            return {"mode": "FAST_PATH", "reason": "Direct media playback fast path"}
 
-        # 4. Multi-agent workflow trigger
+        # 4. Simple application / file / web actions
+        if clean.startswith("open ") and not any(kw in clean for kw in self.AGENTIC_KEYWORDS):
+            # Only complex workflows with explicit reporting/auditing go to agentic
+            if not any(comp in clean for comp in ("audit", "report", "project", "dataset", "confirm playback")):
+                return {"mode": "FAST_PATH", "reason": "Direct opener / single action"}
+
+        # 5. Difficult Multi-Agent Workflows: Only triggered when task is genuinely complex
         if any(kw in clean for kw in self.AGENTIC_KEYWORDS):
-            return {"mode": "AGENTIC_WORKFLOW", "reason": "Contains multi-agent workflow triggers"}
+            return {"mode": "AGENTIC_WORKFLOW", "reason": "Complex multi-agent workflow detected"}
 
-        # 5. Length / complexity heuristic
-        if len(clean.split()) > 7 and (" and " in clean or " then " in clean or "report" in clean):
-            return {"mode": "AGENTIC_WORKFLOW", "reason": "Multi-clause complex goal"}
+        # 6. Difficult multi-step project scaffolding / dataset analysis heuristic
+        if any(k in clean for k in ("create project", "scaffold", "generate dataset", "run test suite", "performance audit")):
+            return {"mode": "AGENTIC_WORKFLOW", "reason": "Complex development/investigation task"}
 
+        # Default: Everything else is FAST_PATH for instantaneous responsiveness
         return {"mode": "FAST_PATH", "reason": "Default single-turn query"}
 
     def execute_goal(

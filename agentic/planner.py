@@ -315,10 +315,10 @@ class PlannerAgent(BaseAgent):
 
     def _plan_youtube_playback(self, plan_id: str, goal: str) -> List[AgentTask]:
         """Plans a 4-step sequential workflow to search and play YouTube media in Chromium."""
-        import re
-        song_query = re.sub(r"\b(?:open|new|tab|in|chromium|youtube|play|song|video|track|please|can|you)\b", "", goal, flags=re.I).strip()
-        if not song_query:
-            song_query = "Believer Imagine Dragons"
+        from agentic.tools import extract_media_song_query
+        song_query = extract_media_song_query(goal)
+        if not song_query or song_query in ["it", "something", "a song", "music", "song"]:
+            song_query = "Top Music Hits"
 
         t1_id = f"{plan_id}_t1_open_youtube"
         t2_id = f"{plan_id}_t2_focus_window"
