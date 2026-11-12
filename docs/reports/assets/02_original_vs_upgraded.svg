@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="100%" height="100%" style="background:#0f172a; font-family:'Inter',system-ui,sans-serif;">
+  <text x="480" y="38" fill="#f8fafc" font-size="20" font-weight="700" text-anchor="middle">ARCHITECTURAL EVOLUTION: ORIGINAL VOID VS AGENTIC VOID</text>
+  <text x="480" y="60" fill="#94a3b8" font-size="12" text-anchor="middle">Evolution from a Single-Turn Chatbot Loop into an Autonomous Multi-Agent Operating System</text>
+
+  <!-- Left: Original Architecture -->
+  <rect x="40" y="90" width="420" height="400" rx="12" fill="#1e293b" stroke="#475569" stroke-width="1.5"/>
+  <rect x="40" y="90" width="420" height="36" rx="12" fill="#334155"/>
+  <text x="250" y="114" fill="#94a3b8" font-size="14" font-weight="700" text-anchor="middle">ORIGINAL VOID (V1.0 - MONOLITHIC)</text>
+
+  <rect x="60" y="145" width="380" height="55" rx="8" fill="#0f172a" stroke="#64748b"/>
+  <text x="250" y="170" fill="#f8fafc" font-size="13" font-weight="600" text-anchor="middle">Voice &amp; Regex Single-Turn Loop</text>
+  <text x="250" y="188" fill="#94a3b8" font-size="11" text-anchor="middle">Linear if-elif command dispatch matching regex</text>
+
+  <rect x="60" y="215" width="380" height="55" rx="8" fill="#0f172a" stroke="#64748b"/>
+  <text x="250" y="240" fill="#f8fafc" font-size="13" font-weight="600" text-anchor="middle">Direct Ollama Chat Function Calling</text>
+  <text x="250" y="258" fill="#94a3b8" font-size="11" text-anchor="middle">Single prompt, max 8 steps iterative while-loop, no DAG</text>
+
+  <rect x="60" y="285" width="380" height="55" rx="8" fill="#0f172a" stroke="#64748b"/>
+  <text x="250" y="310" fill="#f8fafc" font-size="13" font-weight="600" text-anchor="middle">No Independent Verification Gate</text>
+  <text x="250" y="328" fill="#94a3b8" font-size="11" text-anchor="middle">Agent accepted raw LLM claims without evidence checking</text>
+
+  <rect x="60" y="355" width="380" height="55" rx="8" fill="#0f172a" stroke="#64748b"/>
+  <text x="250" y="380" fill="#f8fafc" font-size="13" font-weight="600" text-anchor="middle">Local Only / Hard Offline Failure</text>
+  <text x="250" y="398" fill="#94a3b8" font-size="11" text-anchor="middle">If Ollama daemon stopped, AI brain became unavailable</text>
+
+  <rect x="60" y="425" width="380" height="50" rx="8" fill="#0f172a" stroke="#64748b"/>
+  <text x="250" y="448" fill="#ef4444" font-size="12" font-weight="600" text-anchor="middle">Limitations: No multi-agent division, no rollbacks, fragile recovery</text>
+
+  <!-- Right: Upgraded Architecture -->
+  <rect x="500" y="90" width="420" height="400" rx="12" fill="#1e293b" stroke="#0ea5e9" stroke-width="2"/>
+  <rect x="500" y="90" width="420" height="36" rx="12" fill="#0284c7"/>
+  <text x="710" y="114" fill="#ffffff" font-size="14" font-weight="700" text-anchor="middle">UPGRADED VOID (V2.0 - AGENTIC OS)</text>
+
+  <rect x="520" y="145" width="380" height="55" rx="8" fill="#0f172a" stroke="#0ea5e9"/>
+  <text x="710" y="170" fill="#38bdf8" font-size="13" font-weight="600" text-anchor="middle">Coexistence Router + Sub-5ms Fast Path</text>
+  <text x="710" y="188" fill="#94a3b8" font-size="11" text-anchor="middle">Preserves 100% of direct commands + dynamic agentic dispatch</text>
+
+  <rect x="520" y="215" width="380" height="55" rx="8" fill="#0f172a" stroke="#0ea5e9"/>
+  <text x="710" y="240" fill="#38bdf8" font-size="13" font-weight="600" text-anchor="middle">Hierarchical Multi-Agent DAG Orchestration</text>
+  <text x="710" y="258" fill="#94a3b8" font-size="11" text-anchor="middle">Planner constructs task dependencies; Supervisor delegates to specialists</text>
+
+  <rect x="520" y="285" width="380" height="55" rx="8" fill="#0f172a" stroke="#0ea5e9"/>
+  <text x="710" y="310" fill="#38bdf8" font-size="13" font-weight="600" text-anchor="middle">Rigorous Verification &amp; 4-Tier Permissions</text>
+  <text x="710" y="328" fill="#94a3b8" font-size="11" text-anchor="middle">Independent Verifier tests deliverables; Level 3 approval gates execution</text>
+
+  <rect x="520" y="355" width="380" height="55" rx="8" fill="#0f172a" stroke="#0ea5e9"/>
+  <text x="710" y="380" fill="#38bdf8" font-size="13" font-weight="600" text-anchor="middle">7-Day High Memory &amp; Cloud Fallback</text>
+  <text x="710" y="398" fill="#94a3b8" font-size="11" text-anchor="middle">168h rolling thought retention, weekly digest, proactive cloud onboarding</text>
+
+  <rect x="520" y="425" width="380" height="50" rx="8" fill="#0f172a" stroke="#22c55e"/>
+  <text x="710" y="448" fill="#4ade80" font-size="12" font-weight="600" text-anchor="middle">Genuine Autonomy: Goal understanding, bounded recovery, auditable state</text>
+</svg>

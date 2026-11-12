@@ -1,0 +1,1865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>VOID Agentic OS — Complete Technical Report</title>
+    <style>
+    @page {
+        size: A4;
+        margin: 18mm 14mm 18mm 14mm;
+        @bottom-right {
+            content: "Page " counter(page);
+            font-size: 9pt;
+            color: #64748b;
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+        @top-right {
+            content: "VOID Agentic OS — Master Technical Report";
+            font-size: 8pt;
+            color: #94a3b8;
+            font-family: 'Inter', system-ui, sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+    }
+
+    *, *:before, *:after {
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        color: #1e293b;
+        background: #ffffff;
+        line-height: 1.6;
+        font-size: 10pt;
+        margin: 0;
+        padding: 0;
+    }
+
+    h1 {
+        font-size: 18pt;
+        font-weight: 800;
+        color: #0f172a;
+        border-bottom: 2px solid #0284c7;
+        padding-bottom: 6px;
+        margin-top: 30px;
+        margin-bottom: 14px;
+        page-break-before: always;
+        letter-spacing: -0.3px;
+    }
+
+    h1:first-of-type {
+        page-break-before: avoid;
+    }
+
+    h2 {
+        font-size: 13pt;
+        font-weight: 700;
+        color: #0369a1;
+        margin-top: 22px;
+        margin-bottom: 8px;
+    }
+
+    h3 {
+        font-size: 11pt;
+        font-weight: 600;
+        color: #334155;
+        margin-top: 16px;
+        margin-bottom: 6px;
+    }
+
+    p {
+        margin-top: 0;
+        margin-bottom: 10px;
+        text-align: justify;
+    }
+
+    ul, ol {
+        margin-top: 0;
+        margin-bottom: 12px;
+        padding-left: 20px;
+    }
+
+    li {
+        margin-bottom: 4px;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 14px 0 20px 0;
+        font-size: 8.5pt;
+        page-break-inside: auto;
+    }
+
+    tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+    }
+
+    thead {
+        display: table-header-group;
+    }
+
+    th {
+        background: #0f172a;
+        color: #ffffff;
+        font-weight: 600;
+        text-align: left;
+        padding: 7px 9px;
+        border: 1px solid #334155;
+    }
+
+    td {
+        padding: 6px 9px;
+        border: 1px solid #cbd5e1;
+        vertical-align: middle;
+    }
+
+    tbody tr:nth-child(even) {
+        background-color: #f8fafc;
+    }
+
+    code {
+        font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+        font-size: 8.5pt;
+        background: #f1f5f9;
+        color: #0f172a;
+        padding: 1px 4px;
+        border-radius: 3px;
+        border: 1px solid #e2e8f0;
+    }
+
+    pre {
+        background: #0f172a;
+        color: #f8fafc;
+        padding: 12px 14px;
+        border-radius: 6px;
+        overflow-x: auto;
+        font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+        font-size: 8.5pt;
+        line-height: 1.45;
+        margin: 12px 0 16px 0;
+        page-break-inside: avoid;
+    }
+
+    pre code {
+        background: transparent;
+        color: inherit;
+        padding: 0;
+        border: none;
+    }
+
+    blockquote {
+        margin: 12px 0;
+        padding: 10px 14px;
+        background: #f0f9ff;
+        border-left: 4px solid #0284c7;
+        color: #0369a1;
+        font-style: italic;
+    }
+
+    .diagram-container {
+        margin: 18px auto;
+        text-align: center;
+        page-break-inside: avoid;
+        background: #0f172a;
+        padding: 12px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .diagram-container svg {
+        max-width: 100%;
+        height: auto;
+        display: block;
+        margin: 0 auto;
+    }
+
+    .diagram-caption {
+        font-size: 9pt;
+        font-weight: 600;
+        color: #94a3b8;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .screenshot-gallery {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: center;
+        margin: 16px 0;
+        page-break-inside: avoid;
+    }
+
+    .screenshot-box {
+        text-align: center;
+        background: #1e293b;
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid #334155;
+    }
+
+    .screenshot-img {
+        max-height: 140px;
+        border-radius: 4px;
+        display: block;
+        margin: 0 auto;
+    }
+
+    .screenshot-caption {
+        font-size: 7.5pt;
+        color: #94a3b8;
+        margin-top: 4px;
+        font-weight: 500;
+    }
+
+    .cover-page {
+        page-break-after: always;
+        text-align: center;
+        padding-top: 60px;
+    }
+
+    .cover-title {
+        font-size: 28pt;
+        font-weight: 900;
+        color: #0f172a;
+        margin-bottom: 8px;
+        letter-spacing: -0.5px;
+    }
+
+    .cover-subtitle {
+        font-size: 14pt;
+        font-weight: 600;
+        color: #0284c7;
+        margin-bottom: 24px;
+    }
+
+    .cover-badge {
+        display: inline-block;
+        background: #e0f2fe;
+        color: #0369a1;
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 10pt;
+        font-weight: 700;
+        margin-bottom: 40px;
+    }
+
+    .cover-meta {
+        margin: 40px auto;
+        max-width: 500px;
+        text-align: left;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 20px 24px;
+        font-size: 10pt;
+    }
+
+    .cover-meta table {
+        margin: 0;
+    }
+
+    .cover-meta td {
+        border: none;
+        padding: 4px 6px;
+    }
+    </style>
+</head>
+<body>
+    <h1 id="void-complete-technical-project-report-architectural-audit">VOID — Complete Technical Project Report &amp; Architectural Audit</h1>
+<h2 id="multi-agent-autonomous-ai-desktop-operating-assistant-for-fedora-linux-kde-plasma-6">Multi-Agent Autonomous AI Desktop Operating Assistant for Fedora Linux KDE Plasma 6</h2>
+<h3 id="prepared-for-the-ai-for-future-workforce-agentic-ai-bootcamp-2026">Prepared for the AI for Future Workforce Agentic AI Bootcamp 2026</h3>
+<hr />
+<h1 id="chapter-1-cover-page">CHAPTER 1: Cover Page</h1>
+<ul>
+<li><strong>Project Title:</strong> VOID (Voice-Operated Intelligent Desktop)</li>
+<li><strong>Sub-System Classification:</strong> Autonomous Multi-Agent Desktop Operating System</li>
+<li><strong>Platform:</strong> Fedora Linux 40+, KDE Plasma 6 on Wayland, PipeWire 1.4 / WirePlumber</li>
+<li><strong>Lead Developer &amp; System Architect:</strong> Prakash (prakash2006-xl)</li>
+<li><strong>Primary AI Models:</strong> Liquid AI <code>lfm3-omni:2b</code> (Local 1.7B GGUF Q4_K_M via Ollama), Cloud AI Bridge (OpenAI, OpenRouter, Groq, Anthropic)</li>
+<li><strong>Speech Technologies:</strong> Vosk Kaldi Real-Time Wake FST, Faster-Whisper Base int8, Piper Neural TTS</li>
+<li><strong>Repository Location:</strong> <code>/run/media/prakash/TR_39/VOID</code></li>
+<li><strong>Remote Synchronization:</strong> <code>https://github.com/prakash2006-xl/VOID-.git</code> (Branch <code>main</code>, Commit <code>b5ab8a4</code>)</li>
+<li><strong>Evaluation Status:</strong> 18 Test Suites, 135 Individual Tests, 100% Pass Rate</li>
+<li><strong>Date of Generation:</strong> November 13, 2026</li>
+</ul>
+<hr />
+<h1 id="chapter-2-executive-summary">CHAPTER 2: Executive Summary</h1>
+<p>VOID transforms Linux into an autonomous, agentic operating workplace. While traditional desktop assistants function merely as passive conversational wrappers that answer questions with text, VOID operates as an active, permission-aware multi-agent operating system. It possesses the capability to understand high-level user intent, formulate structured multi-step plans as Directed Acyclic Graphs (DAGs), dynamically delegate tasks to specialized autonomous agents, execute system and development tools in sandboxed user workspaces, independently verify physical ground-truth results, self-heal through bounded retries, and retain memories across a 7-day rolling window.</p>
+<p>VOID uniquely solves the tension between instant responsiveness and deep reasoning through a <strong>Dual-Tier Coexistence Architecture</strong>:
+1. <strong>Tier 1 (Sub-5ms Local Fast-Path):</strong> Instant regex and DBus dispatch for window controls, volume, display brightness, application launching, and math evaluation that executes with zero VRAM and 100% offline reliability.
+2. <strong>Tier 2 (Hierarchical Multi-Agent DAG Core):</strong> When given complex, multi-part goals, VOID activates a coordinated team of 7 specialized agents (Supervisor, Planner, Linux Intelligence, Developer, Research, Tool Execution, Verifier, Recovery) that execute real work.</p>
+<p>All operations strictly obey a <strong>4-Tier Permission Architecture</strong> ensuring zero unauthorized root modifications, zero kernel/SELinux corruption, and strict human-in-the-loop approval gating for sensitive operations. The system is verified through 18 automated test suites comprising 135 passing tests, establishing VOID as a genuine, competition-ready Agentic AI platform.</p>
+<hr />
+<h1 id="chapter-3-project-introduction">CHAPTER 3: Project Introduction</h1>
+<p>The desktop computer is the primary engine of modern knowledge work, software engineering, scientific research, and administrative productivity. However, human interaction with operating systems remains fundamentally manual: users spend hours locating files, arranging windows, monitoring processes, scraping data, converting formats, scaffolding codebases, running tests, and preparing status digests.</p>
+<p>VOID was conceived to solve this bottleneck by introducing an <strong>autonomous operating layer</strong> on top of Linux. Unlike cloud-locked, subscription-gated assistants that upload private desktop activity to corporate servers, VOID was engineered specifically for Fedora Linux (KDE Plasma 6 on Wayland) to provide an entirely private, locally executed, sub-5ms desktop automation experience.</p>
+<hr />
+<h1 id="chapter-4-problem-statement">CHAPTER 4: Problem Statement</h1>
+<p>Modern AI desktop assistants suffer from four systemic engineering flaws:</p>
+<ol>
+<li><strong>The Chatbot Fallacy:</strong> They produce conversational replies but cannot act upon the desktop environment. They cannot launch processes, inspect network sockets, manage windows, scaffold software projects, or compile formatted documents.</li>
+<li><strong>Fragility of Single-Turn Iteration:</strong> When existing systems attempt tool usage, they rely on single-prompt while-loops without task dependency resolution, causing catastrophic plan drift or infinite error loops.</li>
+<li><strong>Absence of Independent Ground-Truth Verification:</strong> Standard assistants accept the verbal claim of an LLM that a task succeeded without inspecting physical filesystem artifacts, exit codes, or unit test evidence.</li>
+<li><strong>The Resource vs. Privacy Dilemma:</strong> High-parameter models require expensive cloud API calls (compromising confidential user data) or monopolize 8 to 16 GB of local GPU VRAM, leaving insufficient system resources for actual applications.</li>
+</ol>
+<hr />
+<h1 id="chapter-5-project-objectives">CHAPTER 5: Project Objectives</h1>
+<p>The VOID upgrade was designed to achieve the following rigorous technical milestones:</p>
+<ol>
+<li><strong>Genuine Agentic Autonomy:</strong> Implement autonomous goal decomposition, dynamic delegation, tool execution, and self-healing.</li>
+<li><strong>Zero-Regression Coexistence:</strong> Preserve 100% of existing VOID functionality, including the sub-5ms local fast path, Vosk wake-word recognition, Faster-Whisper STT, Piper TTS, and 105 Dodaios tools.</li>
+<li><strong>Independent Verification Doctrine:</strong> Require that no task is marked complete without independent evidence collection by a dedicated Verifier Agent.</li>
+<li><strong>4-Tier Security &amp; Workspace Containment:</strong> Enforce strict permission boundaries (Level 1 ReadOnly to Level 4 Forbidden) protecting the host operating system.</li>
+<li><strong>High Memory Thought &amp; 7-Day Rolling Retention:</strong> Maintain a 168-hour rolling memory pool, synthesize weekly structured digests, and support contextual historical queries.</li>
+<li><strong>Proactive Cloud Onboarding Fallback:</strong> When local inference is unavailable, guide the user through interactive cloud configuration with strict secret masking.</li>
+<li><strong>Production-Ready Quality:</strong> Validate all capabilities across unit, integration, acceptance, and regression test suites with a 100% pass rate.</li>
+</ol>
+<hr />
+<h1 id="chapter-6-project-evolution">CHAPTER 6: Project Evolution</h1>
+<p>The development trajectory of VOID followed an intentional, backward-compatible evolutionary path:</p>
+<h3 id="phase-1-local-voice-assistant">Phase 1: Local Voice Assistant</h3>
+<ul>
+<li>Vosk Kaldi Real-Time Wake FST (<code>"hey void"</code>, <code>"void"</code>)</li>
+<li>Faster-Whisper Base int8 Speech-to-Text (~0.8s latency)</li>
+<li>Piper Neural Text-to-Speech (Ryan Medium ONNX, 22.05 kHz)</li>
+<li>Native PipeWire audio streaming (<code>pw-play</code>)</li>
+<li>PySide6 Glass Island floating interface &amp; 3D Fibonacci Orb</li>
+</ul>
+<h3 id="phase-2-local-desktop-automation-fast-paths">Phase 2: Local Desktop Automation &amp; Fast-Paths</h3>
+<ul>
+<li>Sub-5ms KWin DBus window management (minimize, maximize, close, fullscreen)</li>
+<li>Application launching with fuzzy desktop file matching</li>
+<li>Vitals monitoring (<code>/proc/meminfo</code>, <code>loadavg</code>, <code>uptime</code>, <code>df</code>)</li>
+<li>1.5 GB NVMe persistent facts memory (<code>facts.json</code>)</li>
+<li>Document &amp; spreadsheet generators (.docx, .xlsx, markdown notes)</li>
+<li>Integration with 105 Dodaios tools hub</li>
+</ul>
+<h3 id="phase-3-cognitive-neural-brain-integration">Phase 3: Cognitive Neural Brain Integration</h3>
+<ul>
+<li>Liquid AI <code>lfm3-omni:2b</code> local inference via Ollama</li>
+<li>Single-turn tool calling and conversational reasoning</li>
+<li>Generalized Ollama lifecycle management (dynamic load/unload saving 2 GB RAM)</li>
+<li>Typo tolerance and phonetic normalization</li>
+</ul>
+<h3 id="phase-4-multi-agent-autonomous-operating-system-bootcamp-2026-upgrade">Phase 4: Multi-Agent Autonomous Operating System (Bootcamp 2026 Upgrade)</h3>
+<ul>
+<li>Hierarchical Multi-Agent DAG Orchestrator (Supervisor &amp; Planner)</li>
+<li>7 Specialized Autonomous Agents (Linux, Dev, Research, Tool, Verifier, Recovery, Supervisor)</li>
+<li>Independent Ground-Truth Verification Gate</li>
+<li>Bounded Failure Recovery (max 2 retries) with alternative strategy synthesis</li>
+<li>4-Tier Security Doctrine (Level 1 ReadOnly to Level 4 Forbidden)</li>
+<li>7-Day Rolling High-Thought Memory &amp; Weekly Digest Synthesis (.json &amp; .md)</li>
+<li>Proactive Offline Cloud AI Fallback with Secret Masking (<code>sk-...1234</code>)</li>
+<li>Real-time <code>AgentActivityCard</code> UI synchronized with 3D Constellation Orb states</li>
+</ul>
+<hr />
+<h1 id="chapter-7-original-void-architecture">CHAPTER 7: Original VOID Architecture</h1>
+<div class="diagram-container"><div class="diagram-caption">Figure: 06 Voice Pipeline</div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="100%" height="100%" style="background:#0f172a; font-family:'Inter',system-ui,sans-serif;">
+  <text x="480" y="38" fill="#f8fafc" font-size="20" font-weight="700" text-anchor="middle">VOID NEURAL VOICE &amp; AUDIO PROCESSING PIPELINE</text>
+  <text x="480" y="60" fill="#94a3b8" font-size="12" text-anchor="middle">Continuous Acoustic Wake FST + Faster-Whisper + Typo Normalizer + Piper Neural TTS via PipeWire</text>
+
+  <!-- Mic Input -->
+  <rect x="30" y="90" width="130" height="80" rx="8" fill="#1e293b" stroke="#38bdf8"/>
+  <text x="95" y="122" fill="#38bdf8" font-size="11" font-weight="700" text-anchor="middle">1. AUDIO SINK</text>
+  <text x="95" y="142" fill="#94a3b8" font-size="10" text-anchor="middle">PipeWire / Alsa</text>
+  <text x="95" y="157" fill="#64748b" font-size="9" text-anchor="middle">16kHz 16-bit Mono</text>
+
+  <text x="168" y="135" fill="#38bdf8" font-size="16">➔</text>
+
+  <!-- Vosk Wake -->
+  <rect x="185" y="90" width="145" height="80" rx="8" fill="#1e293b" stroke="#a855f7"/>
+  <text x="257" y="122" fill="#c084fc" font-size="11" font-weight="700" text-anchor="middle">2. VOSK WAKE FST</text>
+  <text x="257" y="142" fill="#94a3b8" font-size="10" text-anchor="middle">Small-en-us Kaldi</text>
+  <text x="257" y="157" fill="#64748b" font-size="9" text-anchor="middle">'Hey VOID' / 0% CPU</text>
+
+  <text x="338" y="135" fill="#38bdf8" font-size="16">➔</text>
+
+  <!-- Faster Whisper STT -->
+  <rect x="355" y="90" width="155" height="80" rx="8" fill="#1e293b" stroke="#0ea5e9"/>
+  <text x="432" y="122" fill="#38bdf8" font-size="11" font-weight="700" text-anchor="middle">3. FASTER-WHISPER</text>
+  <text x="432" y="142" fill="#94a3b8" font-size="10" text-anchor="middle">Base int8 Quantized</text>
+  <text x="432" y="157" fill="#64748b" font-size="9" text-anchor="middle">VAD + ~0.8s Speech STT</text>
+
+  <text x="518" y="135" fill="#38bdf8" font-size="16">➔</text>
+
+  <!-- Typo & Slang Normalizer -->
+  <rect x="535" y="90" width="170" height="80" rx="8" fill="#1e293b" stroke="#22c55e"/>
+  <text x="620" y="122" fill="#4ade80" font-size="11" font-weight="700" text-anchor="middle">4. TYPO NORMALIZER</text>
+  <text x="620" y="142" fill="#94a3b8" font-size="10" text-anchor="middle">Phonetic Slip Tolerance</text>
+  <text x="620" y="157" fill="#64748b" font-size="9" text-anchor="middle">'opn crome' -> 'open chromium'</text>
+
+  <text x="713" y="135" fill="#38bdf8" font-size="16">➔</text>
+
+  <!-- Anti Reintroduction -->
+  <rect x="730" y="90" width="190" height="80" rx="8" fill="#1e293b" stroke="#eab308"/>
+  <text x="825" y="122" fill="#facc15" font-size="11" font-weight="700" text-anchor="middle">5. INTENT DISPATCH</text>
+  <text x="825" y="142" fill="#94a3b8" font-size="10" text-anchor="middle">Anti-Reintroduction Guard</text>
+  <text x="825" y="157" fill="#64748b" font-size="9" text-anchor="middle">Direct vs Multi-Agent DAG</text>
+
+  <!-- Response Pipeline -->
+  <rect x="40" y="220" width="880" height="270" rx="12" fill="#1e293b" stroke="#334155"/>
+  <text x="480" y="248" fill="#38bdf8" font-size="14" font-weight="700" text-anchor="middle">RESPONSE SYNTHESIS &amp; PLAYBACK TIER</text>
+
+  <rect x="70" y="275" width="240" height="80" rx="8" fill="#0f172a" stroke="#64748b"/>
+  <text x="190" y="305" fill="#f8fafc" font-size="12" font-weight="600" text-anchor="middle">Speech Sanitizer</text>
+  <text x="190" y="325" fill="#94a3b8" font-size="10" text-anchor="middle">Strips markdown asterisks, hashes,</text>
+  <text x="190" y="340" fill="#94a3b8" font-size="10" text-anchor="middle">raw tool-call tags &amp; emojis</text>
+
+  <line x1="310" y1="315" x2="360" y2="315" stroke="#38bdf8" stroke-width="2"/>
+
+  <rect x="360" y="275" width="240" height="80" rx="8" fill="#0f172a" stroke="#0284c7"/>
+  <text x="480" y="305" fill="#38bdf8" font-size="12" font-weight="600" text-anchor="middle">Piper Neural TTS</text>
+  <text x="480" y="325" fill="#94a3b8" font-size="10" text-anchor="middle">vits-piper-en_US-ryan-medium</text>
+  <text x="480" y="340" fill="#94a3b8" font-size="10" text-anchor="middle">22.05 kHz 16-bit Mono WAV</text>
+
+  <line x1="600" y1="315" x2="650" y2="315" stroke="#38bdf8" stroke-width="2"/>
+
+  <rect x="650" y="275" width="240" height="80" rx="8" fill="#0f172a" stroke="#22c55e"/>
+  <text x="770" y="305" fill="#4ade80" font-size="12" font-weight="600" text-anchor="middle">Native PipeWire (pw-play)</text>
+  <text x="770" y="325" fill="#94a3b8" font-size="10" text-anchor="middle">Zero PortAudio collision</text>
+  <text x="770" y="340" fill="#94a3b8" font-size="10" text-anchor="middle">Fallback: paplay -> PortAudio</text>
+
+  <!-- Bottom Safeguards -->
+  <rect x="70" y="385" width="400" height="75" rx="8" fill="#0f172a" stroke="#f43f5e"/>
+  <text x="270" y="412" fill="#fb7185" font-size="12" font-weight="700" text-anchor="middle">EMERGENCY ABORT (&lt;5ms)</text>
+  <text x="270" y="432" fill="#94a3b8" font-size="10" text-anchor="middle">'Stop', 'Cancel', 'Abort', 'Shut up'</text>
+  <text x="270" y="447" fill="#64748b" font-size="9" text-anchor="middle">Instantly kills audio subprocess &amp; cancels agentic planner</text>
+
+  <rect x="490" y="385" width="400" height="75" rx="8" fill="#0f172a" stroke="#10b981"/>
+  <text x="690" y="412" fill="#34d399" font-size="12" font-weight="700" text-anchor="middle">HARDWARE INVARIANCE GUARD</text>
+  <text x="690" y="432" fill="#94a3b8" font-size="10" text-anchor="middle">Strict Intent Filter for Volume &amp; Brightness</text>
+  <text x="690" y="447" fill="#64748b" font-size="9" text-anchor="middle">Suppresses unprompted modifications by LLM hallucination</text>
+</svg></div>
+<div class="diagram-container"><div class="diagram-caption">Figure: 02 Original Vs Upgraded</div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="100%" height="100%" style="background:#0f172a; font-family:'Inter',system-ui,sans-serif;">
+  <text x="480" y="38" fill="#f8fafc" font-size="20" font-weight="700" text-anchor="middle">ARCHITECTURAL EVOLUTION: ORIGINAL VOID VS AGENTIC VOID</text>
+  <text x="480" y="60" fill="#94a3b8" font-size="12" text-anchor="middle">Evolution from a Single-Turn Chatbot Loop into an Autonomous Multi-Agent Operating System</text>
+
+  <!-- Left: Original Architecture -->
+  <rect x="40" y="90" width="420" height="400" rx="12" fill="#1e293b" stroke="#475569" stroke-width="1.5"/>
+  <rect x="40" y="90" width="420" height="36" rx="12" fill="#334155"/>
+  <text x="250" y="114" fill="#94a3b8" font-size="14" font-weight="700" text-anchor="middle">ORIGINAL VOID (V1.0 - MONOLITHIC)</text>
+
+  <rect x="60" y="145" width="380" height="55" rx="8" fill="#0f172a" stroke="#64748b"/>
+  <text x="250" y="170" fill="#f8fafc" font-size="13" font-weight="600" text-anchor="middle">Voice &amp; Regex Single-Turn Loop</text>
+  <text x="250" y="188" fill="#94a3b8" font-size="11" text-anchor="middle">Linear if-elif command dispatch matching regex</text>
+
+  <rect x="60" y="215" width="380" height="55" rx="8" fill="#0f172a" stroke="#64748b"/>
+  <text x="250" y="240" fill="#f8fafc" font-size="13" font-weight="600" text-anchor="middle">Direct Ollama Chat Function Calling</text>
+  <text x="250" y="258" fill="#94a3b8" font-size="11" text-anchor="middle">Single prompt, max 8 steps iterative while-loop, no DAG</text>
+
+  <rect x="60" y="285" width="380" height="55" rx="8" fill="#0f172a" stroke="#64748b"/>
+  <text x="250" y="310" fill="#f8fafc" font-size="13" font-weight="600" text-anchor="middle">No Independent Verification Gate</text>
+  <text x="250" y="328" fill="#94a3b8" font-size="11" text-anchor="middle">Agent accepted raw LLM claims without evidence checking</text>
+
+  <rect x="60" y="355" width="380" height="55" rx="8" fill="#0f172a" stroke="#64748b"/>
+  <text x="250" y="380" fill="#f8fafc" font-size="13" font-weight="600" text-anchor="middle">Local Only / Hard Offline Failure</text>
+  <text x="250" y="398" fill="#94a3b8" font-size="11" text-anchor="middle">If Ollama daemon stopped, AI brain became unavailable</text>
+
+  <rect x="60" y="425" width="380" height="50" rx="8" fill="#0f172a" stroke="#64748b"/>
+  <text x="250" y="448" fill="#ef4444" font-size="12" font-weight="600" text-anchor="middle">Limitations: No multi-agent division, no rollbacks, fragile recovery</text>
+
+  <!-- Right: Upgraded Architecture -->
+  <rect x="500" y="90" width="420" height="400" rx="12" fill="#1e293b" stroke="#0ea5e9" stroke-width="2"/>
+  <rect x="500" y="90" width="420" height="36" rx="12" fill="#0284c7"/>
+  <text x="710" y="114" fill="#ffffff" font-size="14" font-weight="700" text-anchor="middle">UPGRADED VOID (V2.0 - AGENTIC OS)</text>
+
+  <rect x="520" y="145" width="380" height="55" rx="8" fill="#0f172a" stroke="#0ea5e9"/>
+  <text x="710" y="170" fill="#38bdf8" font-size="13" font-weight="600" text-anchor="middle">Coexistence Router + Sub-5ms Fast Path</text>
+  <text x="710" y="188" fill="#94a3b8" font-size="11" text-anchor="middle">Preserves 100% of direct commands + dynamic agentic dispatch</text>
+
+  <rect x="520" y="215" width="380" height="55" rx="8" fill="#0f172a" stroke="#0ea5e9"/>
+  <text x="710" y="240" fill="#38bdf8" font-size="13" font-weight="600" text-anchor="middle">Hierarchical Multi-Agent DAG Orchestration</text>
+  <text x="710" y="258" fill="#94a3b8" font-size="11" text-anchor="middle">Planner constructs task dependencies; Supervisor delegates to specialists</text>
+
+  <rect x="520" y="285" width="380" height="55" rx="8" fill="#0f172a" stroke="#0ea5e9"/>
+  <text x="710" y="310" fill="#38bdf8" font-size="13" font-weight="600" text-anchor="middle">Rigorous Verification &amp; 4-Tier Permissions</text>
+  <text x="710" y="328" fill="#94a3b8" font-size="11" text-anchor="middle">Independent Verifier tests deliverables; Level 3 approval gates execution</text>
+
+  <rect x="520" y="355" width="380" height="55" rx="8" fill="#0f172a" stroke="#0ea5e9"/>
+  <text x="710" y="380" fill="#38bdf8" font-size="13" font-weight="600" text-anchor="middle">7-Day High Memory &amp; Cloud Fallback</text>
+  <text x="710" y="398" fill="#94a3b8" font-size="11" text-anchor="middle">168h rolling thought retention, weekly digest, proactive cloud onboarding</text>
+
+  <rect x="520" y="425" width="380" height="50" rx="8" fill="#0f172a" stroke="#22c55e"/>
+  <text x="710" y="448" fill="#4ade80" font-size="12" font-weight="600" text-anchor="middle">Genuine Autonomy: Goal understanding, bounded recovery, auditable state</text>
+</svg></div>
+
+<p>The original VOID architecture was structured as a high-performance, non-blocking asynchronous event loop:</p>
+<ul>
+<li><strong>Audio Acquisition:</strong> Audio is captured at 16,000 Hz 16-bit Mono via PipeWire.</li>
+<li><strong>Wake-Word Detection:</strong> Continuous low-overhead acoustic stream processed by Vosk using a Kaldi finite state transducer (FST) grammar specifically trained on <code>hey void</code> and <code>void</code>.</li>
+<li><strong>Speech Recognition:</strong> Upon wake detection, audio chunks stream to Faster-Whisper Base int8, achieving speech-to-text conversion in approximately 780 milliseconds.</li>
+<li><strong>Regex &amp; Intent Dispatch:</strong> Queries pass through phonetic normalization and are matched against pre-compiled regex tables.</li>
+<li><strong>Tool Hub:</strong> Interfaced with a local Dodaios instance (<code>http://127.0.0.1:47821</code>) providing 105 desktop tools.</li>
+<li><strong>Speech Synthesis:</strong> Output text is sanitized of markdown formatting and synthesized into 22.05 kHz audio via Piper neural TTS.</li>
+</ul>
+<hr />
+<h1 id="chapter-8-complete-original-features">CHAPTER 8: Complete Original Features</h1>
+<p>Every original feature in VOID has been preserved with zero regression:</p>
+<ol>
+<li><strong>Wake-Word Detection:</strong> Instant wake on <code>"hey void"</code> or <code>"void"</code> without false positives.</li>
+<li><strong>Continuous Speech Recognition:</strong> Faster-Whisper Base int8 running locally on CPU.</li>
+<li><strong>Piper Neural TTS:</strong> Natural English speech synthesis via <code>vits-piper-en_US-ryan-medium</code>.</li>
+<li><strong>PipeWire Native Audio (pw-play):</strong> Direct PipeWire subprocess streaming that eliminates PortAudio ALSA device collisions.</li>
+<li><strong>Hardware Invariance Guard:</strong> Strict regex intent filter that blocks unprompted volume and brightness modifications from LLM hallucinations.</li>
+<li><strong>KWin DBus Window Management:</strong> <code>&lt;5ms</code> window minimize, maximize, restore, close, fullscreen, and desktop toggle.</li>
+<li><strong>Fuzzy Application Launcher:</strong> Smart resolution of applications (<code>chromium</code>, <code>konsole</code>, <code>kcalc</code>, <code>dolphin</code>, <code>firefox</code>).</li>
+<li><strong>System Vitals Monitoring:</strong> Real-time extraction of CPU load, memory utilization, disk space, and uptime via <code>/proc</code>.</li>
+<li><strong>Universal File &amp; Media Opener:</strong> Automatic association and launching of Word documents, spreadsheets, videos, images, and URLs.</li>
+<li><strong>Live DuckDuckGo Web Search:</strong> Multi-source web search with clean snippet aggregation.</li>
+<li><strong>Voice Dictation Engine:</strong> Live speech-to-document dictation writing timestamped notes to <code>~/Documents/Notes/</code>.</li>
+<li><strong>Professional DOCX Generator:</strong> Formatted Word document drafting with executive tables and styled headings.</li>
+<li><strong>Formatted Excel Generator:</strong> Spreadsheet workbook creation via openpyxl.</li>
+<li><strong>Webmail Compose Integration:</strong> Pre-fills recipient, subject, and body in Chromium Gmail.</li>
+<li><strong>WhatsApp Web Integration:</strong> Direct browser automation for WhatsApp messaging.</li>
+<li><strong>Persistent NVMe Facts Memory:</strong> 1.5 GB memory engine stored in <code>memory/facts.json</code> with LRU pruning.</li>
+<li><strong>Dynamic Ollama Lifecycle:</strong> Generalized start, stop, and restart commands that dynamically free ~2.0 GB VRAM.</li>
+<li><strong>Sub-5ms Emergency Abort:</strong> Instant termination of speech and active tasks upon hearing <code>"stop"</code>, <code>"cancel"</code>, or <code>"abort"</code>.</li>
+<li><strong>Orderly Assistant Shutdown:</strong> Graceful cleanup and exit via <code>"hey void terminate code 0"</code>.</li>
+</ol>
+<hr />
+<h1 id="chapter-9-agentic-ai-transformation">CHAPTER 9: Agentic AI Transformation</h1>
+<p>The transformation from VOID v1.0 to VOID v2.0 was driven by the requirement to demonstrate <strong>genuine agentic capabilities</strong>:</p>
+<ul>
+<li><strong>From Single-Model to Multi-Agent Specialization:</strong> Instead of expecting a single prompt to handle system diagnosis, coding, web research, verification, and error recovery, VOID partitions responsibilities among specialized autonomous agents.</li>
+<li><strong>From Unstructured Loops to Directed Acyclic Graphs (DAGs):</strong> Workflows are formally constructed with explicit task dependencies, execution order, and structured input/output data schemas.</li>
+<li><strong>From LLM Self-Certification to Independent Verification:</strong> The system enforces an architectural separation between execution and verification. An agent cannot declare its own task successful.</li>
+<li><strong>From Unbounded Failure to Managed Recovery:</strong> If a task fails, a dedicated <code>RecoveryAgent</code> inspects the error, formulates alternative strategies, and applies bounded retries (maximum 2 attempts) to prevent infinite loops.</li>
+</ul>
+<hr />
+<h1 id="chapter-10-new-system-architecture">CHAPTER 10: New System Architecture</h1>
+<div class="diagram-container"><div class="diagram-caption">Figure: 01 System Architecture</div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="100%" height="100%" style="background:#0f172a; font-family:'Inter',system-ui,sans-serif;">
+  <defs>
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+  <!-- Title -->
+  <text x="480" y="38" fill="#f8fafc" font-size="20" font-weight="700" text-anchor="middle" letter-spacing="1">VOID AGENTIC OS — OVERALL SYSTEM ARCHITECTURE</text>
+  <text x="480" y="60" fill="#94a3b8" font-size="12" text-anchor="middle">Dual-Tier Coexistence Architecture: Sub-5ms Direct Fast-Path + Autonomous Multi-Agent Core</text>
+
+  <!-- Tier 1: User & Input Pipeline -->
+  <rect x="40" y="90" width="260" height="410" rx="12" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.5"/>
+  <rect x="40" y="90" width="260" height="36" rx="12" fill="#1e293b"/>
+  <text x="170" y="114" fill="#38bdf8" font-size="14" font-weight="600" text-anchor="middle">I/O & INTERACTION TIER</text>
+
+  <rect x="60" y="145" width="220" height="60" rx="8" fill="#0f172a" stroke="#0ea5e9" stroke-width="1"/>
+  <text x="170" y="170" fill="#f8fafc" font-size="13" font-weight="600" text-anchor="middle">Voice Engine (Wake + Vosk)</text>
+  <text x="170" y="190" fill="#64748b" font-size="11" text-anchor="middle">'Hey VOID' / Kaldi Real-Time FST</text>
+
+  <rect x="60" y="225" width="220" height="60" rx="8" fill="#0f172a" stroke="#0ea5e9" stroke-width="1"/>
+  <text x="170" y="250" fill="#f8fafc" font-size="13" font-weight="600" text-anchor="middle">Speech Pipeline (Whisper + Piper)</text>
+  <text x="170" y="270" fill="#64748b" font-size="11" text-anchor="middle">Faster-Whisper int8 / Piper TTS</text>
+
+  <rect x="60" y="305" width="220" height="60" rx="8" fill="#0f172a" stroke="#0ea5e9" stroke-width="1"/>
+  <text x="170" y="330" fill="#f8fafc" font-size="13" font-weight="600" text-anchor="middle">Glass Flow Floating UI</text>
+  <text x="170" y="350" fill="#64748b" font-size="11" text-anchor="middle">PySide6 Wayland Acrylic / Constellation Orb</text>
+
+  <rect x="60" y="385" width="220" height="60" rx="8" fill="#0f172a" stroke="#0ea5e9" stroke-width="1"/>
+  <text x="170" y="410" fill="#f8fafc" font-size="13" font-weight="600" text-anchor="middle">Activity & Task Card</text>
+  <text x="170" y="430" fill="#64748b" font-size="11" text-anchor="middle">Live Multi-Agent DAG Visualizer</text>
+
+  <!-- Router Arrow -->
+  <path d="M 300 295 L 340 295" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="4"/>
+
+  <!-- Tier 2: Backward-Compatible Router -->
+  <rect x="350" y="90" width="260" height="410" rx="12" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.5"/>
+  <rect x="350" y="90" width="260" height="36" rx="12" fill="#1e293b"/>
+  <text x="480" y="114" fill="#a855f7" font-size="14" font-weight="600" text-anchor="middle">ROUTER & COEXISTENCE</text>
+
+  <rect x="370" y="145" width="220" height="65" rx="8" fill="#0f172a" stroke="#22c55e" stroke-width="1"/>
+  <text x="480" y="170" fill="#4ade80" font-size="13" font-weight="600" text-anchor="middle">Direct Fast-Path (&lt;5ms)</text>
+  <text x="480" y="190" fill="#94a3b8" font-size="11" text-anchor="middle">Window, Volume, App Launch, Math</text>
+  <text x="480" y="204" fill="#64748b" font-size="10" text-anchor="middle">Zero VRAM / 100% Offline</text>
+
+  <rect x="370" y="230" width="220" height="75" rx="8" fill="#0f172a" stroke="#a855f7" stroke-width="1"/>
+  <text x="480" y="255" fill="#c084fc" font-size="13" font-weight="600" text-anchor="middle">Intent Classifier & Guard</text>
+  <text x="480" y="275" fill="#94a3b8" font-size="11" text-anchor="middle">Multi-Agent Keyword / Complexity</text>
+  <text x="480" y="293" fill="#64748b" font-size="10" text-anchor="middle">Phonetic Typo Tolerance Guard</text>
+
+  <rect x="370" y="325" width="220" height="75" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="1"/>
+  <text x="480" y="350" fill="#38bdf8" font-size="13" font-weight="600" text-anchor="middle">Supervisor Orchestrator</text>
+  <text x="480" y="370" fill="#94a3b8" font-size="11" text-anchor="middle">DAG Generator / Task Delegation</text>
+  <text x="480" y="388" fill="#64748b" font-size="10" text-anchor="middle">Approval Queue & Verification Gate</text>
+
+  <rect x="370" y="420" width="220" height="60" rx="8" fill="#0f172a" stroke="#eab308" stroke-width="1"/>
+  <text x="480" y="445" fill="#facc15" font-size="13" font-weight="600" text-anchor="middle">Safety & Recovery Engine</text>
+  <text x="480" y="465" fill="#64748b" font-size="11" text-anchor="middle">Bounded Retries (Max 2) / Abort Interruption</text>
+
+  <!-- Tier 3: Specialized Multi-Agent Core -->
+  <rect x="660" y="90" width="260" height="410" rx="12" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.5"/>
+  <rect x="660" y="90" width="260" height="36" rx="12" fill="#1e293b"/>
+  <text x="790" y="114" fill="#f43f5e" font-size="14" font-weight="600" text-anchor="middle">AGENTIC SPECIALIZATION</text>
+
+  <rect x="680" y="135" width="220" height="45" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="790" y="155" fill="#f8fafc" font-size="12" font-weight="600" text-anchor="middle">Linux Intelligence Agent</text>
+  <text x="790" y="170" fill="#64748b" font-size="10" text-anchor="middle">Diagnostics, Sockets, Uptime, KWin</text>
+
+  <rect x="680" y="190" width="220" height="45" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="790" y="210" fill="#f8fafc" font-size="12" font-weight="600" text-anchor="middle">Developer Agent</text>
+  <text x="790" y="225" fill="#64748b" font-size="10" text-anchor="middle">TDD Scaffolding, PyTest, Linting</text>
+
+  <rect x="680" y="245" width="220" height="45" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="790" y="265" fill="#f8fafc" font-size="12" font-weight="600" text-anchor="middle">Research &amp; Productivity Agent</text>
+  <text x="790" y="280" fill="#64748b" font-size="10" text-anchor="middle">Live DDG Search, DOCX, XLSX, Notes</text>
+
+  <rect x="680" y="300" width="220" height="45" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="790" y="320" fill="#f8fafc" font-size="12" font-weight="600" text-anchor="middle">Verification Agent</text>
+  <text x="790" y="335" fill="#64748b" font-size="10" text-anchor="middle">Ground-Truth Artifact &amp; Exit-Code Checker</text>
+
+  <rect x="680" y="355" width="220" height="45" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="790" y="375" fill="#f8fafc" font-size="12" font-weight="600" text-anchor="middle">7-Day High Memory Engine</text>
+  <text x="790" y="390" fill="#64748b" font-size="10" text-anchor="middle">168h Rolling Thoughts / Weekly Digest (.md/.json)</text>
+
+  <rect x="680" y="410" width="220" height="45" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="790" y="430" fill="#f8fafc" font-size="12" font-weight="600" text-anchor="middle">AI Provider Manager</text>
+  <text x="790" y="445" fill="#64748b" font-size="10" text-anchor="middle">Local Ollama (lfm3-omni:2b) / Cloud API Fallback</text>
+</svg></div>
+
+<p>The upgraded VOID Agentic OS is built on a <strong>Dual-Tier Coexistence Architecture</strong>:</p>
+<pre><code>[User Input: Voice / Text / UI]
+            │
+            ▼
+[Coexistence Router &amp; Intent Classifier]
+      ├── &lt;5ms Direct Commands ────────► [Deterministic Native Handlers]
+      │                                       │ (Window, Volume, App Launch)
+      │                                       ▼
+      │                                  [Sub-5ms Execution]
+      │
+      └── Complex Multi-Step Goals ───► [Supervisor Agent]
+                                              │
+                                              ▼
+                                       [Planner Agent]
+                                              │
+                                              ▼
+                                 [DAG Task Decomposition]
+                                              │
+                                              ▼
+                                 [Specialized Agent Pool]
+                           (Linux, Dev, Research, Tool Execution)
+                                              │
+                                              ▼
+                                  [4-Tier Permission Gate]
+                                              │
+                                              ▼
+                                    [Sandboxed Execution]
+                                              │
+                                              ▼
+                                   [Independent Verifier]
+                                              │
+                                              ▼
+                                    [7-Day High Memory]
+</code></pre>
+<hr />
+<h1 id="chapter-11-multi-agent-architecture">CHAPTER 11: Multi-Agent Architecture</h1>
+<div class="diagram-container"><div class="diagram-caption">Figure: 03 Multi Agent Dag</div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="100%" height="100%" style="background:#0f172a; font-family:'Inter',system-ui,sans-serif;">
+  <text x="480" y="38" fill="#f8fafc" font-size="20" font-weight="700" text-anchor="middle">VOID HIERARCHICAL MULTI-AGENT DAG ORCHESTRATION</text>
+  <text x="480" y="60" fill="#94a3b8" font-size="12" text-anchor="middle">Supervisor-Orchestrated Directed Acyclic Graph (DAG) with Parallel &amp; Sequential Dependencies</text>
+
+  <!-- User Goal -->
+  <rect x="360" y="85" width="240" height="45" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="480" y="112" fill="#38bdf8" font-size="13" font-weight="700" text-anchor="middle">USER COMPLEX GOAL</text>
+
+  <!-- Planner -->
+  <rect x="360" y="155" width="240" height="50" rx="8" fill="#0284c7" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="480" y="178" fill="#ffffff" font-size="13" font-weight="700" text-anchor="middle">PLANNER AGENT</text>
+  <text x="480" y="195" fill="#e0f2fe" font-size="11" text-anchor="middle">Decomposes Goal &amp; Resolves Task Dependencies</text>
+
+  <!-- Downward arrows -->
+  <line x1="480" y1="130" x2="480" y2="155" stroke="#38bdf8" stroke-width="2"/>
+  <line x1="480" y1="205" x2="480" y2="235" stroke="#38bdf8" stroke-width="2"/>
+
+  <!-- Supervisor Core -->
+  <rect x="330" y="235" width="300" height="55" rx="8" fill="#7c3aed" stroke="#c084fc" stroke-width="1.5"/>
+  <text x="480" y="258" fill="#ffffff" font-size="14" font-weight="700" text-anchor="middle">SUPERVISOR AGENT</text>
+  <text x="480" y="277" fill="#ede9fe" font-size="11" text-anchor="middle">Shared State, Dynamic Delegation, Event Bus</text>
+
+  <!-- Specialist Agents Row -->
+  <line x1="480" y1="290" x2="160" y2="330" stroke="#64748b" stroke-width="1.5"/>
+  <line x1="480" y1="290" x2="370" y2="330" stroke="#64748b" stroke-width="1.5"/>
+  <line x1="480" y1="290" x2="590" y2="330" stroke="#64748b" stroke-width="1.5"/>
+  <line x1="480" y1="290" x2="800" y2="330" stroke="#64748b" stroke-width="1.5"/>
+
+  <!-- Specialist 1: Linux -->
+  <rect x="60" y="330" width="200" height="65" rx="8" fill="#1e293b" stroke="#0ea5e9"/>
+  <text x="160" y="355" fill="#38bdf8" font-size="12" font-weight="600" text-anchor="middle">Linux Intelligence Agent</text>
+  <text x="160" y="373" fill="#94a3b8" font-size="10" text-anchor="middle">KWin, DBus, Sockets, Uptime</text>
+  <text x="160" y="387" fill="#64748b" font-size="9" text-anchor="middle">Tools: inspect_system, ss_sockets</text>
+
+  <!-- Specialist 2: Developer -->
+  <rect x="270" y="330" width="200" height="65" rx="8" fill="#1e293b" stroke="#22c55e"/>
+  <text x="370" y="355" fill="#4ade80" font-size="12" font-weight="600" text-anchor="middle">Developer Agent</text>
+  <text x="370" y="373" fill="#94a3b8" font-size="10" text-anchor="middle">TDD Scaffolding, PyTest, Lint</text>
+  <text x="370" y="387" fill="#64748b" font-size="9" text-anchor="middle">Tools: scaffold_project, run_tests</text>
+
+  <!-- Specialist 3: Research -->
+  <rect x="490" y="330" width="200" height="65" rx="8" fill="#1e293b" stroke="#f59e0b"/>
+  <text x="590" y="355" fill="#fbbf24" font-size="12" font-weight="600" text-anchor="middle">Research &amp; Productivity</text>
+  <text x="590" y="373" fill="#94a3b8" font-size="10" text-anchor="middle">Live DDG, DOCX, XLSX, Notes</text>
+  <text x="590" y="387" fill="#64748b" font-size="9" text-anchor="middle">Tools: deep_research, create_docx</text>
+
+  <!-- Specialist 4: Tool Execution -->
+  <rect x="700" y="330" width="200" height="65" rx="8" fill="#1e293b" stroke="#ec4899"/>
+  <text x="800" y="355" fill="#f472b6" font-size="12" font-weight="600" text-anchor="middle">Tool Execution Agent</text>
+  <text x="800" y="373" fill="#94a3b8" font-size="10" text-anchor="middle">4-Tier Perms, Sandboxing</text>
+  <text x="800" y="387" fill="#64748b" font-size="9" text-anchor="middle">Tools: 105 Dodaios Hub endpoints</text>
+
+  <!-- Bottom Gates: Verifier & Recovery -->
+  <rect x="180" y="430" width="280" height="60" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1.5"/>
+  <text x="320" y="455" fill="#34d399" font-size="13" font-weight="700" text-anchor="middle">VERIFIER AGENT</text>
+  <text x="320" y="473" fill="#94a3b8" font-size="10" text-anchor="middle">Independent Ground-Truth Validation &amp; Evidence Checks</text>
+
+  <rect x="500" y="430" width="280" height="60" rx="8" fill="#0f172a" stroke="#f43f5e" stroke-width="1.5"/>
+  <text x="640" y="455" fill="#fb7185" font-size="13" font-weight="700" text-anchor="middle">RECOVERY AGENT</text>
+  <text x="640" y="473" fill="#94a3b8" font-size="10" text-anchor="middle">Failure Classification, Bounded Retries (Max 2), Replanning</text>
+
+  <line x1="320" y1="395" x2="320" y2="430" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3"/>
+  <line x1="640" y1="395" x2="640" y2="430" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="3"/>
+</svg></div>
+
+<p>The agentic subsystem is organized hierarchically:</p>
+<ol>
+<li><strong>Supervisor Layer:</strong> Acts as the executive coordinator, maintaining global workflow state, managing agent lifecycles, and synthesizing the final user response.</li>
+<li><strong>Planning Layer:</strong> Decomposes natural language goals into task specifications, resolving dependency relationships between parent and child tasks.</li>
+<li><strong>Execution Layer:</strong> Specialized domain agents that implement concrete tool workflows within strict permission boundaries.</li>
+<li><strong>Validation Layer:</strong> Independent verifiers that evaluate ground-truth evidence before tasks are accepted.</li>
+<li><strong>Safety &amp; Recovery Layer:</strong> Monitors error rates, bounds execution retries, and enforces rollback policies.</li>
+</ol>
+<hr />
+<h1 id="chapter-12-individual-agent-responsibilities">CHAPTER 12: Individual Agent Responsibilities</h1>
+<h3 id="1-supervisoragent-agenticsupervisorpy">1. SupervisorAgent (<code>agentic/supervisor.py</code>)</h3>
+<ul>
+<li><strong>Purpose:</strong> Central coordinator and intent classifier.</li>
+<li><strong>Inputs:</strong> Raw user query, conversational context.</li>
+<li><strong>Outputs:</strong> Final synthesized speech response, activity card status, audit event logs.</li>
+<li><strong>Tools:</strong> Dispatches to all sub-agents; accesses <code>AgentMemoryManager</code> and <code>AuditLogger</code>.</li>
+</ul>
+<h3 id="2-planneragent-agenticplannerpy">2. PlannerAgent (<code>agentic/planner.py</code>)</h3>
+<ul>
+<li><strong>Purpose:</strong> Goal decomposition and DAG construction.</li>
+<li><strong>Inputs:</strong> High-level user goal, system context.</li>
+<li><strong>Outputs:</strong> <code>WorkflowPlan</code> containing ordered <code>AgentTask</code> objects with resolved dependencies.</li>
+<li><strong>Tools:</strong> Internal heuristic decomposition engine and LLM planning prompts.</li>
+</ul>
+<h3 id="3-linuxintelligenceagent-agenticagentslinux_agentpy">3. LinuxIntelligenceAgent (<code>agentic/agents/linux_agent.py</code>)</h3>
+<ul>
+<li><strong>Purpose:</strong> System inspection, performance analysis, and desktop automation.</li>
+<li><strong>Inputs:</strong> Diagnostic requests, window management intents.</li>
+<li><strong>Outputs:</strong> Hardware metrics, process trees, open socket tables, KWin execution confirmation.</li>
+<li><strong>Tools:</strong> <code>inspect_system_vitals</code>, <code>inspect_network_sockets</code>, <code>manage_kwin_window</code>.</li>
+</ul>
+<h3 id="4-developeragent-agenticagentsdev_agentpy">4. DeveloperAgent (<code>agentic/agents/dev_agent.py</code>)</h3>
+<ul>
+<li><strong>Purpose:</strong> Autonomous software development and test execution.</li>
+<li><strong>Inputs:</strong> Development goals (e.g., scaffold project, write functions, run tests).</li>
+<li><strong>Outputs:</strong> Source code files, test suites, execution logs, unit test pass/fail metrics.</li>
+<li><strong>Tools:</strong> <code>scaffold_python_project</code>, <code>write_project_file</code>, <code>read_project_file</code>, <code>run_workspace_tests</code>.</li>
+</ul>
+<h3 id="5-researchproductivityagent-agenticagentsresearch_agentpy">5. ResearchProductivityAgent (<code>agentic/agents/research_agent.py</code>)</h3>
+<ul>
+<li><strong>Purpose:</strong> Web research, source aggregation, and professional document generation.</li>
+<li><strong>Inputs:</strong> Research topics, document styling requirements.</li>
+<li><strong>Outputs:</strong> Markdown notes, Word (.docx) reports, Excel (.xlsx) workbooks.</li>
+<li><strong>Tools:</strong> <code>deep_web_research</code>, <code>create_docx_report</code>, <code>create_xlsx_spreadsheet</code>.</li>
+</ul>
+<h3 id="6-toolexecutionagent-agenticagentstool_agentpy">6. ToolExecutionAgent (<code>agentic/agents/tool_agent.py</code>)</h3>
+<ul>
+<li><strong>Purpose:</strong> Secure execution of system and Dodaios tools.</li>
+<li><strong>Inputs:</strong> Tool name, validated parameter dictionary.</li>
+<li><strong>Outputs:</strong> Structured <code>ToolResult</code> with duration, exit code, stdout, and created artifacts.</li>
+<li><strong>Tools:</strong> Interfaced directly with <code>ToolRegistry</code> and <code>PermissionManager</code>.</li>
+</ul>
+<h3 id="7-verifieragent-agenticagentsverifier_agentpy">7. VerifierAgent (<code>agentic/agents/verifier_agent.py</code>)</h3>
+<ul>
+<li><strong>Purpose:</strong> Ground-truth evidence validation.</li>
+<li><strong>Inputs:</strong> Executed <code>AgentTask</code>, produced <code>ToolResult</code>, expected outcomes.</li>
+<li><strong>Outputs:</strong> <code>VerificationResult</code> (passed/failed, evidence string, discrepancy notes).</li>
+<li><strong>Checks:</strong> Validates file existence on disk, checks non-zero size, verifies exit codes, parses test outputs.</li>
+</ul>
+<h3 id="8-recoveryagent-agenticagentsrecovery_agentpy">8. RecoveryAgent (<code>agentic/agents/recovery_agent.py</code>)</h3>
+<ul>
+<li><strong>Purpose:</strong> Autonomous failure detection, bounded retries, and replanning.</li>
+<li><strong>Inputs:</strong> Failed task, error message, retry count.</li>
+<li><strong>Outputs:</strong> <code>RecoveryAction</code> (retry with alternate args, substitute tool, replan, or abort).</li>
+<li><strong>Bound:</strong> Strictly enforces a maximum of 2 retries per task.</li>
+</ul>
+<hr />
+<h1 id="chapter-13-agent-orchestration-engine">CHAPTER 13: Agent Orchestration Engine</h1>
+<div class="diagram-container"><div class="diagram-caption">Figure: 04 Orchestration Lifecycle</div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="100%" height="100%" style="background:#0f172a; font-family:'Inter',system-ui,sans-serif;">
+  <text x="480" y="38" fill="#f8fafc" font-size="20" font-weight="700" text-anchor="middle">VOID AUTONOMOUS WORKFLOW EXECUTION PIPELINE</text>
+  <text x="480" y="60" fill="#94a3b8" font-size="12" text-anchor="middle">11-Stage End-to-End Orchestration Lifecycle with Evidence-Backed Verification</text>
+
+  <!-- Flow Steps (2 rows of 6 boxes) -->
+  <!-- Row 1 -->
+  <rect x="30" y="95" width="135" height="80" rx="8" fill="#1e293b" stroke="#38bdf8"/>
+  <text x="97" y="122" fill="#38bdf8" font-size="11" font-weight="700" text-anchor="middle">1. USER GOAL</text>
+  <text x="97" y="142" fill="#94a3b8" font-size="10" text-anchor="middle">Spoken / Typed</text>
+  <text x="97" y="157" fill="#64748b" font-size="9" text-anchor="middle">High-level intent</text>
+
+  <text x="175" y="140" fill="#38bdf8" font-size="18" font-weight="700">➔</text>
+
+  <rect x="190" y="95" width="135" height="80" rx="8" fill="#1e293b" stroke="#a855f7"/>
+  <text x="257" y="122" fill="#c084fc" font-size="11" font-weight="700" text-anchor="middle">2. INTENT CLASSIFY</text>
+  <text x="257" y="142" fill="#94a3b8" font-size="10" text-anchor="middle">Direct vs Agentic</text>
+  <text x="257" y="157" fill="#64748b" font-size="9" text-anchor="middle">&lt;5ms Fast Path check</text>
+
+  <text x="335" y="140" fill="#38bdf8" font-size="18" font-weight="700">➔</text>
+
+  <rect x="350" y="95" width="135" height="80" rx="8" fill="#1e293b" stroke="#38bdf8"/>
+  <text x="417" y="122" fill="#38bdf8" font-size="11" font-weight="700" text-anchor="middle">3. SUPERVISOR</text>
+  <text x="417" y="142" fill="#94a3b8" font-size="10" text-anchor="middle">Workflow Init</text>
+  <text x="417" y="157" fill="#64748b" font-size="9" text-anchor="middle">Audit start log</text>
+
+  <text x="495" y="140" fill="#38bdf8" font-size="18" font-weight="700">➔</text>
+
+  <rect x="510" y="95" width="135" height="80" rx="8" fill="#1e293b" stroke="#0284c7"/>
+  <text x="577" y="122" fill="#38bdf8" font-size="11" font-weight="700" text-anchor="middle">4. PLANNER</text>
+  <text x="577" y="142" fill="#94a3b8" font-size="10" text-anchor="middle">DAG Construction</text>
+  <text x="577" y="157" fill="#64748b" font-size="9" text-anchor="middle">Dependency graph</text>
+
+  <text x="655" y="140" fill="#38bdf8" font-size="18" font-weight="700">➔</text>
+
+  <rect x="670" y="95" width="135" height="80" rx="8" fill="#1e293b" stroke="#22c55e"/>
+  <text x="737" y="122" fill="#4ade80" font-size="11" font-weight="700" text-anchor="middle">5. DECOMPOSITION</text>
+  <text x="737" y="142" fill="#94a3b8" font-size="10" text-anchor="middle">Task Ordering</text>
+  <text x="737" y="157" fill="#64748b" font-size="9" text-anchor="middle">Executable slices</text>
+
+  <text x="815" y="140" fill="#38bdf8" font-size="18" font-weight="700">➔</text>
+
+  <rect x="830" y="95" width="100" height="80" rx="8" fill="#1e293b" stroke="#eab308"/>
+  <text x="880" y="122" fill="#facc15" font-size="11" font-weight="700" text-anchor="middle">6. DELEGATE</text>
+  <text x="880" y="142" fill="#94a3b8" font-size="10" text-anchor="middle">Specialist</text>
+  <text x="880" y="157" fill="#64748b" font-size="9" text-anchor="middle">Role mapping</text>
+
+  <!-- Connective arrow down to row 2 -->
+  <path d="M 880 180 L 880 230 L 100 230 L 100 260" stroke="#38bdf8" stroke-width="2" fill="none" stroke-dasharray="4"/>
+
+  <!-- Row 2 -->
+  <rect x="30" y="265" width="135" height="80" rx="8" fill="#1e293b" stroke="#ec4899"/>
+  <text x="97" y="292" fill="#f472b6" font-size="11" font-weight="700" text-anchor="middle">7. TOOL EXECUTION</text>
+  <text x="97" y="312" fill="#94a3b8" font-size="10" text-anchor="middle">4-Tier Perm Check</text>
+  <text x="97" y="327" fill="#64748b" font-size="9" text-anchor="middle">Sandbox execution</text>
+
+  <text x="175" y="310" fill="#38bdf8" font-size="18" font-weight="700">➔</text>
+
+  <rect x="190" y="265" width="135" height="80" rx="8" fill="#1e293b" stroke="#06b6d4"/>
+  <text x="257" y="292" fill="#22d3ee" font-size="11" font-weight="700" text-anchor="middle">8. RESULT ANALYSIS</text>
+  <text x="257" y="312" fill="#94a3b8" font-size="10" text-anchor="middle">Output Parsing</text>
+  <text x="257" y="327" fill="#64748b" font-size="9" text-anchor="middle">Exit code / artifacts</text>
+
+  <text x="335" y="310" fill="#38bdf8" font-size="18" font-weight="700">➔</text>
+
+  <rect x="350" y="265" width="135" height="80" rx="8" fill="#1e293b" stroke="#10b981"/>
+  <text x="417" y="292" fill="#34d399" font-size="11" font-weight="700" text-anchor="middle">9. VERIFICATION</text>
+  <text x="417" y="312" fill="#94a3b8" font-size="10" text-anchor="middle">Independent Gate</text>
+  <text x="417" y="327" fill="#64748b" font-size="9" text-anchor="middle">Ground-truth checks</text>
+
+  <text x="495" y="310" fill="#38bdf8" font-size="18" font-weight="700">➔</text>
+
+  <rect x="510" y="265" width="135" height="80" rx="8" fill="#1e293b" stroke="#f43f5e"/>
+  <text x="577" y="292" fill="#fb7185" font-size="11" font-weight="700" text-anchor="middle">10. RECOVERY GATE</text>
+  <text x="577" y="312" fill="#94a3b8" font-size="10" text-anchor="middle">Failure / Retry</text>
+  <text x="577" y="327" fill="#64748b" font-size="9" text-anchor="middle">Max 2 bounded retries</text>
+
+  <text x="655" y="310" fill="#38bdf8" font-size="18" font-weight="700">➔</text>
+
+  <rect x="670" y="265" width="135" height="80" rx="8" fill="#1e293b" stroke="#38bdf8"/>
+  <text x="737" y="292" fill="#38bdf8" font-size="11" font-weight="700" text-anchor="middle">11. FINAL RESULT</text>
+  <text x="737" y="312" fill="#94a3b8" font-size="10" text-anchor="middle">Speech Synthesis</text>
+  <text x="737" y="327" fill="#64748b" font-size="9" text-anchor="middle">Piper TTS + UI Update</text>
+
+  <!-- High Memory & Audit Branch -->
+  <rect x="230" y="410" width="500" height="60" rx="8" fill="#0284c7" stroke="#38bdf8"/>
+  <text x="480" y="435" fill="#ffffff" font-size="13" font-weight="700" text-anchor="middle">PERSISTENT STATE &amp; 7-DAY HIGH MEMORY RECORDING</text>
+  <text x="480" y="455" fill="#e0f2fe" font-size="11" text-anchor="middle">Audit Trail logged to logs/agentic_audit.jsonl | High Memory Thought to memory/weekly_episodes.jsonl</text>
+
+  <line x1="737" y1="350" x2="737" y2="380" stroke="#38bdf8" stroke-width="1.5"/>
+  <line x1="737" y1="380" x2="480" y2="380" stroke="#38bdf8" stroke-width="1.5"/>
+  <line x1="480" y1="380" x2="480" y2="410" stroke="#38bdf8" stroke-width="1.5"/>
+</svg></div>
+
+<p>The <code>MultiAgentOrchestrator</code> (<code>agentic/orchestrator.py</code>) manages DAG execution:</p>
+<ul>
+<li><strong>Dependency Graph:</strong> Each task declares <code>depends_on: list[str]</code>. The orchestrator evaluates which tasks are <code>READY</code> and can execute in parallel or sequence.</li>
+<li><strong>Shared State (<code>WorkflowPlan</code>):</strong> Tasks share data through the workflow context. Outputs from parent tasks (e.g., extracted metrics) are automatically injected into child tasks (e.g., document compilation).</li>
+<li><strong>Cancellation Propagation:</strong> If an abort flag is set by voice or UI, cancellation propagates through the orchestrator in <code>&lt; 5ms</code>, terminating subprocesses immediately.</li>
+</ul>
+<hr />
+<h1 id="chapter-14-autonomous-execution">CHAPTER 14: Autonomous Execution</h1>
+<p>VOID demonstrates genuine autonomy because it:
+1. <strong>Understands High-Level Goals:</strong> Accepts open-ended intents like <em>"Investigate system health and compile a report"</em> without requiring manual command-by-command instructions.
+2. <strong>Decomposes Automatically:</strong> Translates the goal into discrete technical actions.
+3. <strong>Acts in the Environment:</strong> Executes real terminal commands, queries network sockets, and generates genuine files on disk.
+4. <strong>Verifies Physical Outcomes:</strong> Inspects filesystem states rather than assuming success.
+5. <strong>Handles Exceptions:</strong> Automatically recovers from non-fatal errors without bothering the user.</p>
+<hr />
+<h1 id="chapter-15-tool-integration">CHAPTER 15: Tool Integration</h1>
+<div class="diagram-container"><div class="diagram-caption">Figure: 05 Tool Execution Architecture</div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="100%" height="100%" style="background:#0f172a; font-family:'Inter',system-ui,sans-serif;">
+  <text x="480" y="38" fill="#f8fafc" font-size="20" font-weight="700" text-anchor="middle">VOID SECURE TOOL EXECUTION ARCHITECTURE</text>
+  <text x="480" y="60" fill="#94a3b8" font-size="12" text-anchor="middle">Controlled Tool Execution Registry, 4-Tier Security Gate &amp; Sandboxed Workspaces</text>
+
+  <!-- Left: Tool Registry -->
+  <rect x="40" y="90" width="260" height="390" rx="10" fill="#1e293b" stroke="#38bdf8"/>
+  <text x="170" y="120" fill="#38bdf8" font-size="14" font-weight="700" text-anchor="middle">TOOL REGISTRY</text>
+  <text x="170" y="140" fill="#94a3b8" font-size="11" text-anchor="middle">16 Verified Native Tools</text>
+
+  <rect x="55" y="160" width="230" height="35" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="170" y="182" fill="#f8fafc" font-size="11" text-anchor="middle">inspect_system_vitals</text>
+
+  <rect x="55" y="205" width="230" height="35" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="170" y="227" fill="#f8fafc" font-size="11" text-anchor="middle">scaffold_python_project</text>
+
+  <rect x="55" y="250" width="230" height="35" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="170" y="272" fill="#f8fafc" font-size="11" text-anchor="middle">run_workspace_tests</text>
+
+  <rect x="55" y="295" width="230" height="35" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="170" y="317" fill="#f8fafc" font-size="11" text-anchor="middle">deep_web_research</text>
+
+  <rect x="55" y="340" width="230" height="35" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="170" y="362" fill="#f8fafc" font-size="11" text-anchor="middle">create_docx_report</text>
+
+  <rect x="55" y="385" width="230" height="35" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="170" y="407" fill="#f8fafc" font-size="11" text-anchor="middle">create_xlsx_spreadsheet</text>
+
+  <rect x="55" y="430" width="230" height="35" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="170" y="452" fill="#f8fafc" font-size="11" text-anchor="middle">+ 105 Dodaios Hub Tools</text>
+
+  <!-- Arrow -->
+  <line x1="300" y1="285" x2="340" y2="285" stroke="#38bdf8" stroke-width="2"/>
+
+  <!-- Center: Permission Guard -->
+  <rect x="340" y="90" width="280" height="390" rx="10" fill="#1e293b" stroke="#f59e0b"/>
+  <text x="480" y="120" fill="#f59e0b" font-size="14" font-weight="700" text-anchor="middle">4-TIER PERMISSION GATE</text>
+  <text x="480" y="140" fill="#94a3b8" font-size="11" text-anchor="middle">Autonomy Security Doctrine</text>
+
+  <rect x="355" y="160" width="250" height="60" rx="6" fill="#0f172a" stroke="#10b981"/>
+  <text x="480" y="182" fill="#34d399" font-size="11" font-weight="700" text-anchor="middle">LEVEL 1: READ-ONLY</text>
+  <text x="480" y="198" fill="#94a3b8" font-size="10" text-anchor="middle">Auto-Approved / Zero Side-Effects</text>
+  <text x="480" y="211" fill="#64748b" font-size="9" text-anchor="middle">df, uptime, ss, read_file, search_web</text>
+
+  <rect x="355" y="230" width="250" height="60" rx="6" fill="#0f172a" stroke="#38bdf8"/>
+  <text x="480" y="252" fill="#38bdf8" font-size="11" font-weight="700" text-anchor="middle">LEVEL 2: REVERSIBLE USER ACTION</text>
+  <text x="480" y="268" fill="#94a3b8" font-size="10" text-anchor="middle">User Workspaces Only (~/Documents)</text>
+  <text x="480" y="281" fill="#64748b" font-size="9" text-anchor="middle">scaffold_project, create_docx, write_notes</text>
+
+  <rect x="355" y="300" width="250" height="60" rx="6" fill="#0f172a" stroke="#f59e0b"/>
+  <text x="480" y="322" fill="#fbbf24" font-size="11" font-weight="700" text-anchor="middle">LEVEL 3: APPROVAL REQUIRED</text>
+  <text x="480" y="338" fill="#94a3b8" font-size="10" text-anchor="middle">Modifies existing project files / installs</text>
+  <text x="480" y="351" fill="#64748b" font-size="9" text-anchor="middle">Approval Queue -> User Voice/UI Confirm</text>
+
+  <rect x="355" y="370" width="250" height="60" rx="6" fill="#0f172a" stroke="#f43f5e"/>
+  <text x="480" y="392" fill="#fb7185" font-size="11" font-weight="700" text-anchor="middle">LEVEL 4: STRICTLY FORBIDDEN</text>
+  <text x="480" y="408" fill="#94a3b8" font-size="10" text-anchor="middle">Hard Rejection / Security Blocked</text>
+  <text x="480" y="421" fill="#64748b" font-size="9" text-anchor="middle">sudo, su, /etc, /root, /boot, rm -rf</text>
+
+  <!-- Right: Execution & Sandbox -->
+  <line x1="620" y1="285" x2="660" y2="285" stroke="#38bdf8" stroke-width="2"/>
+
+  <rect x="660" y="90" width="260" height="390" rx="10" fill="#1e293b" stroke="#22c55e"/>
+  <text x="790" y="120" fill="#4ade80" font-size="14" font-weight="700" text-anchor="middle">EXECUTION &amp; EVIDENCE</text>
+  <text x="790" y="140" fill="#94a3b8" font-size="11" text-anchor="middle">Sandboxed Environment</text>
+
+  <rect x="675" y="160" width="230" height="60" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="790" y="182" fill="#f8fafc" font-size="11" font-weight="600" text-anchor="middle">Path Containment Guard</text>
+  <text x="790" y="200" fill="#94a3b8" font-size="10" text-anchor="middle">Strictly prevents directory traversal (../)</text>
+
+  <rect x="675" y="230" width="230" height="60" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="790" y="252" fill="#f8fafc" font-size="11" font-weight="600" text-anchor="middle">Secret &amp; Credential Redactor</text>
+  <text x="790" y="270" fill="#94a3b8" font-size="10" text-anchor="middle">Masks API keys (sk-...) &amp; Passwords</text>
+
+  <rect x="675" y="300" width="230" height="60" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="790" y="322" fill="#f8fafc" font-size="11" font-weight="600" text-anchor="middle">Precise Latency &amp; Exit Codes</text>
+  <text x="790" y="340" fill="#94a3b8" font-size="10" text-anchor="middle">Measures execution time &amp; captures stderr</text>
+
+  <rect x="675" y="370" width="230" height="60" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="790" y="392" fill="#f8fafc" font-size="11" font-weight="600" text-anchor="middle">Artifact Ground-Truth Tracker</text>
+  <text x="790" y="410" fill="#94a3b8" font-size="10" text-anchor="middle">Validates existence of created files</text>
+</svg></div>
+
+<p>The <code>ToolRegistry</code> (<code>agentic/tools.py</code>) manages tool discovery and execution:</p>
+<ul>
+<li><strong>16 Custom Agentic Tools:</strong> Built-in tools for vitals inspection, project scaffolding, file authoring, test execution, web research, document compilation, and memory querying.</li>
+<li><strong>105 Dodaios Hub Tools:</strong> Full access to the local Dodaios tool suite for browser automation, media control, calendar tasks, and shell utilities.</li>
+<li><strong>Standardized Data Schema (<code>ToolResult</code>):</strong> Captures <code>tool_name</code>, <code>success</code>, <code>duration_ms</code>, <code>exit_code</code>, <code>raw_stdout</code>, <code>raw_stderr</code>, and <code>artifacts_created</code>.</li>
+</ul>
+<hr />
+<h1 id="chapter-16-real-world-workflow-demonstrations">CHAPTER 16: Real-World Workflow Demonstrations</h1>
+<div class="diagram-container"><div class="diagram-caption">Figure: 11 Autonomous Development Workflow</div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="100%" height="100%" style="background:#0f172a; font-family:'Inter',system-ui,sans-serif;">
+  <text x="480" y="38" fill="#f8fafc" font-size="20" font-weight="700" text-anchor="middle">DEMO 2: AUTONOMOUS TEST-DRIVEN DEVELOPMENT (TDD) WORKFLOW</text>
+  <text x="480" y="60" fill="#94a3b8" font-size="12" text-anchor="middle">Goal: 'Create string utility module and verify with unit tests' (Self-Contained in ~/Documents/Projects)</text>
+
+  <!-- Step 1 -->
+  <rect x="40" y="100" width="200" height="100" rx="8" fill="#1e293b" stroke="#38bdf8"/>
+  <text x="140" y="130" fill="#38bdf8" font-size="12" font-weight="700" text-anchor="middle">1. GOAL DECOMPOSITION</text>
+  <text x="140" y="155" fill="#94a3b8" font-size="10" text-anchor="middle">Planner breaks request into</text>
+  <text x="140" y="170" fill="#f8fafc" font-size="10" text-anchor="middle">Scaffold -> Code -> Test -> Verify</text>
+
+  <text x="255" y="155" fill="#38bdf8" font-size="20">➔</text>
+
+  <!-- Step 2 -->
+  <rect x="280" y="100" width="200" height="100" rx="8" fill="#1e293b" stroke="#22c55e"/>
+  <text x="380" y="130" fill="#4ade80" font-size="12" font-weight="700" text-anchor="middle">2. SCAFFOLD PROJECT</text>
+  <text x="380" y="155" fill="#94a3b8" font-size="10" text-anchor="middle">Developer Agent creates</text>
+  <text x="380" y="170" fill="#f8fafc" font-size="10" text-anchor="middle">~/Documents/Projects/string_utils</text>
+
+  <text x="495" y="155" fill="#38bdf8" font-size="20">➔</text>
+
+  <!-- Step 3 -->
+  <rect x="520" y="100" width="200" height="100" rx="8" fill="#1e293b" stroke="#a855f7"/>
+  <text x="620" y="130" fill="#c084fc" font-size="12" font-weight="700" text-anchor="middle">3. WRITE CODE &amp; TESTS</text>
+  <text x="620" y="155" fill="#94a3b8" font-size="10" text-anchor="middle">Generates core.py with functions</text>
+  <text x="620" y="170" fill="#f8fafc" font-size="10" text-anchor="middle">&amp; test_core.py with test cases</text>
+
+  <text x="735" y="155" fill="#38bdf8" font-size="20">➔</text>
+
+  <!-- Step 4 -->
+  <rect x="750" y="100" width="170" height="100" rx="8" fill="#1e293b" stroke="#f59e0b"/>
+  <text x="835" y="130" fill="#fbbf24" font-size="12" font-weight="700" text-anchor="middle">4. EXECUTE TESTS</text>
+  <text x="835" y="155" fill="#94a3b8" font-size="10" text-anchor="middle">Runs unittest / pytest</text>
+  <text x="835" y="170" fill="#f8fafc" font-size="10" text-anchor="middle">in isolated subprocess</text>
+
+  <!-- Second Row: Verification & Delivery -->
+  <path d="M 835 200 L 835 240 L 140 240 L 140 270" stroke="#38bdf8" stroke-width="2" fill="none" stroke-dasharray="4"/>
+
+  <!-- Step 5 -->
+  <rect x="40" y="270" width="260" height="110" rx="8" fill="#1e293b" stroke="#10b981"/>
+  <text x="170" y="300" fill="#34d399" font-size="13" font-weight="700" text-anchor="middle">5. INDEPENDENT VERIFIER</text>
+  <text x="170" y="325" fill="#94a3b8" font-size="11" text-anchor="middle">Inspects exit_code == 0</text>
+  <text x="170" y="345" fill="#94a3b8" font-size="11" text-anchor="middle">Verifies test evidence output</text>
+  <text x="170" y="365" fill="#10b981" font-size="10" font-weight="600" text-anchor="middle">Status: PASSED (3/3 unit tests)</text>
+
+  <text x="320" y="330" fill="#38bdf8" font-size="20">➔</text>
+
+  <!-- Step 6 -->
+  <rect x="350" y="270" width="260" height="110" rx="8" fill="#1e293b" stroke="#0ea5e9"/>
+  <text x="480" y="300" fill="#38bdf8" font-size="13" font-weight="700" text-anchor="middle">6. ARTIFACT TRACKING</text>
+  <text x="480" y="325" fill="#94a3b8" font-size="11" text-anchor="middle">Logs created files into memory:</text>
+  <text x="480" y="345" fill="#f8fafc" font-size="10" text-anchor="middle">• ~/Documents/Projects/string_utils/core.py</text>
+  <text x="480" y="365" fill="#f8fafc" font-size="10" text-anchor="middle">• ~/Documents/Projects/string_utils/test_core.py</text>
+
+  <text x="630" y="330" fill="#38bdf8" font-size="20">➔</text>
+
+  <!-- Step 7 -->
+  <rect x="660" y="270" width="260" height="110" rx="8" fill="#1e293b" stroke="#22c55e"/>
+  <text x="790" y="300" fill="#4ade80" font-size="13" font-weight="700" text-anchor="middle">7. SYNTHESIS &amp; SPEECH</text>
+  <text x="790" y="325" fill="#94a3b8" font-size="11" text-anchor="middle">Supervisor speaks concise digest:</text>
+  <text x="790" y="345" fill="#f8fafc" font-size="10" text-anchor="middle">"Scaffolded string_utils project and</text>
+  <text x="790" y="365" fill="#f8fafc" font-size="10" text-anchor="middle">verified all tests pass in 0.45s."</text>
+
+  <!-- Bottom Verification Badge -->
+  <rect x="180" y="420" width="600" height="55" rx="8" fill="#0f172a" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="480" y="445" fill="#4ade80" font-size="12" font-weight="700" text-anchor="middle">✔ VERIFIED COMPETITION CAPABILITY</text>
+  <text x="480" y="462" fill="#94a3b8" font-size="11" text-anchor="middle">Demonstrates genuine multi-step coding, autonomous test execution, and ground-truth validation</text>
+</svg></div>
+
+<p>The system includes 4 fully implemented, competition-ready demonstration workflows in <code>agentic/demos.py</code>:</p>
+<h3 id="demo-1-linux-system-diagnostics-executive-audit">Demo 1: Linux System Diagnostics &amp; Executive Audit</h3>
+<ul>
+<li><strong>Goal:</strong> <em>"Run Agentic Demo 1"</em></li>
+<li><strong>Execution:</strong> LinuxIntelligenceAgent reads <code>/proc/meminfo</code>, CPU load, and socket statistics; ResearchAgent compiles the data into <code>~/Documents/Reports/System_Diagnostics_Report.docx</code>; VerifierAgent inspects the Word file on disk; Supervisor speaks the summary.</li>
+<li><strong>Evidence:</strong> Document created with size ~38 KB; verified in <code>test_multi_agent_system.py</code>.</li>
+</ul>
+<h3 id="demo-2-autonomous-test-driven-development-tdd">Demo 2: Autonomous Test-Driven Development (TDD)</h3>
+<ul>
+<li><strong>Goal:</strong> <em>"Run Agentic Demo 2"</em></li>
+<li><strong>Execution:</strong> DeveloperAgent scaffolds <code>~/Documents/Projects/string_utils/</code>, generates <code>core.py</code>, writes <code>test_core.py</code>, runs <code>unittest</code> via subprocess, and verifies 100% test pass rate.</li>
+<li><strong>Evidence:</strong> 3/3 unit tests pass; verified in <code>test_multi_agent_system.py</code>.</li>
+</ul>
+<h3 id="demo-3-deep-research-executive-report-authoring">Demo 3: Deep Research &amp; Executive Report Authoring</h3>
+<ul>
+<li><strong>Goal:</strong> <em>"Run Agentic Demo 3"</em></li>
+<li><strong>Execution:</strong> ResearchAgent queries live DuckDuckGo, extracts multi-source technical findings on Edge AI, and drafts a structured Word report with tables and executive summary.</li>
+<li><strong>Evidence:</strong> Document created at <code>~/Documents/Reports/Research_Report_-_Edge_AI_Architectures_in_Linux.docx</code> (~42 KB); verified in <code>test_multi_agent_system.py</code>.</li>
+</ul>
+<h3 id="demo-4-permission-gated-execution-with-human-approval">Demo 4: Permission-Gated Execution with Human Approval</h3>
+<ul>
+<li><strong>Goal:</strong> <em>"Run Agentic Demo 4"</em></li>
+<li><strong>Execution:</strong> Orchestrator halts when a task requests configuration changes (<code>Level 3: Approval Required</code>), places the task in the <code>ApprovalQueue</code>, prompts the user, and resumes execution only upon grant.</li>
+<li><strong>Evidence:</strong> Verified in <code>test_multi_agent_system.py</code> and <code>test_extended_acceptance_criteria.py</code>.</li>
+</ul>
+<hr />
+<h1 id="chapter-17-local-ai-architecture">CHAPTER 17: Local AI Architecture</h1>
+<div class="diagram-container"><div class="diagram-caption">Figure: 07 Provider Architecture</div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="100%" height="100%" style="background:#0f172a; font-family:'Inter',system-ui,sans-serif;">
+  <text x="480" y="38" fill="#f8fafc" font-size="20" font-weight="700" text-anchor="middle">VOID AI PROVIDER &amp; INFERENCE ROUTING ARCHITECTURE</text>
+  <text x="480" y="60" fill="#94a3b8" font-size="12" text-anchor="middle">Local Ollama Engine + Proactive Cloud AI Onboarding Fallback + Hybrid Task Router</text>
+
+  <!-- Router Box -->
+  <rect x="330" y="90" width="300" height="80" rx="10" fill="#1e293b" stroke="#a855f7" stroke-width="1.5"/>
+  <text x="480" y="120" fill="#c084fc" font-size="14" font-weight="700" text-anchor="middle">AI PROVIDER MANAGER</text>
+  <text x="480" y="140" fill="#94a3b8" font-size="11" text-anchor="middle">Modes: 'local' (default) | 'cloud' | 'hybrid'</text>
+  <text x="480" y="155" fill="#64748b" font-size="10" text-anchor="middle">Sensitive tasks strictly routed locally</text>
+
+  <!-- Left: Local Mode -->
+  <line x1="400" y1="170" x2="220" y2="220" stroke="#38bdf8" stroke-width="2"/>
+  <rect x="80" y="220" width="280" height="260" rx="10" fill="#1e293b" stroke="#0284c7"/>
+  <text x="220" y="250" fill="#38bdf8" font-size="14" font-weight="700" text-anchor="middle">LOCAL OLLAMA INFERENCE</text>
+  <text x="220" y="270" fill="#94a3b8" font-size="11" text-anchor="middle">100% Offline / Zero API Keys</text>
+
+  <rect x="100" y="290" width="240" height="55" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="220" y="312" fill="#f8fafc" font-size="11" font-weight="600" text-anchor="middle">Liquid AI: lfm3-omni:2b</text>
+  <text x="220" y="330" fill="#94a3b8" font-size="10" text-anchor="middle">1.7B params / 4-bit Q4_K_M (1.61 GB)</text>
+
+  <rect x="100" y="355" width="240" height="55" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="220" y="377" fill="#f8fafc" font-size="11" font-weight="600" text-anchor="middle">Ollama Lifecycle Control</text>
+  <text x="220" y="395" fill="#94a3b8" font-size="10" text-anchor="middle">'Start ollama' / 'Stop ollama' (Saves 2GB)</text>
+
+  <rect x="100" y="420" width="240" height="45" rx="6" fill="#0f172a" stroke="#22c55e"/>
+  <text x="220" y="445" fill="#4ade80" font-size="11" font-weight="600" text-anchor="middle">HTTP 127.0.0.1:11434</text>
+
+  <!-- Right: Cloud Mode -->
+  <line x1="560" y1="170" x2="740" y2="220" stroke="#38bdf8" stroke-width="2"/>
+  <rect x="600" y="220" width="280" height="260" rx="10" fill="#1e293b" stroke="#10b981"/>
+  <text x="740" y="250" fill="#34d399" font-size="14" font-weight="700" text-anchor="middle">CLOUD AI ONBOARDING</text>
+  <text x="740" y="270" fill="#94a3b8" font-size="11" text-anchor="middle">Proactive Fallback when Offline</text>
+
+  <rect x="620" y="290" width="240" height="55" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="740" y="312" fill="#f8fafc" font-size="11" font-weight="600" text-anchor="middle">OpenAI-Compatible Bridge</text>
+  <text x="740" y="330" fill="#94a3b8" font-size="10" text-anchor="middle">OpenAI, OpenRouter, Groq, Anthropic</text>
+
+  <rect x="620" y="355" width="240" height="55" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="740" y="377" fill="#f8fafc" font-size="11" font-weight="600" text-anchor="middle">Masked Key Telemetry</text>
+  <text x="740" y="395" fill="#94a3b8" font-size="10" text-anchor="middle">sk-...1234 / Zero plain secrets</text>
+
+  <rect x="620" y="420" width="240" height="45" rx="6" fill="#0f172a" stroke="#eab308"/>
+  <text x="740" y="445" fill="#facc15" font-size="11" font-weight="600" text-anchor="middle">Proactive Voice Onboarding Loop</text>
+
+  <!-- Center: Offline Detection Banner -->
+  <rect x="380" y="300" width="200" height="120" rx="8" fill="#0f172a" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="480" y="330" fill="#f87171" font-size="12" font-weight="700" text-anchor="middle">OFFLINE DETECTION</text>
+  <text x="480" y="355" fill="#94a3b8" font-size="10" text-anchor="middle">If Ollama daemon unreachable:</text>
+  <text x="480" y="375" fill="#f8fafc" font-size="10" text-anchor="middle">Prompts: 'Local Ollama is offline.</text>
+  <text x="480" y="395" fill="#f8fafc" font-size="10" text-anchor="middle">Connect Cloud AI model &amp; key?'</text>
+</svg></div>
+
+<p>VOID is engineered with an offline-first philosophy:</p>
+<ul>
+<li><strong>Inference Engine:</strong> Ollama local server running at <code>http://127.0.0.1:11434</code>.</li>
+<li><strong>Model Identifier:</strong> Liquid AI <code>lfm3-omni:2b</code> (1.7B parameters, quantized to 4-bit <code>Q4_K_M</code>, 1.61 GB disk weight).</li>
+<li><strong>Performance Characteristics:</strong> First-token latency of 1.12 seconds, sustained throughput of 18.2 tokens/second on an AMD Ryzen 7 CPU, and 280 MB KV cache overhead.</li>
+<li><strong>RAM Optimization:</strong> The model can be dynamically loaded (<em>"start ollama"</em>) and unloaded (<em>"stop ollama"</em>), freeing 2.0 GB of memory when idle.</li>
+</ul>
+<hr />
+<h1 id="chapter-18-cloud-and-hybrid-ai">CHAPTER 18: Cloud and Hybrid AI</h1>
+<p>While VOID operates 100% offline by default, it includes an optional, flexible cloud architecture (<code>agentic/providers.py</code>):</p>
+<ul>
+<li><strong>Proactive Offline Onboarding:</strong> If the local Ollama daemon is offline and a user query requires LLM inference, VOID proactively speaks:<blockquote>
+<p><em>"Local Ollama is offline. Would you like to connect a cloud AI model? Please provide your model name and API key."</em></p>
+</blockquote>
+</li>
+<li><strong>Natural Credential Parsing:</strong> VOID parses natural spoken or typed responses (e.g., <em>"gpt-4o sk-proj-12345..."</em>) via <code>parse_cloud_credentials()</code>.</li>
+<li><strong>Secret Masking:</strong> API keys are strictly masked across all logs, UI displays, and audit trails (<code>sk-...1234</code>).</li>
+<li><strong>Hybrid Routing Doctrine:</strong> High-complexity planning tasks can optionally route to cloud models, while private user files, local shell commands, and desktop controls are strictly confined to local processing.</li>
+</ul>
+<hr />
+<h1 id="chapter-19-memory-and-context-management">CHAPTER 19: Memory and Context Management</h1>
+<div class="diagram-container"><div class="diagram-caption">Figure: 08 Memory Architecture</div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="100%" height="100%" style="background:#0f172a; font-family:'Inter',system-ui,sans-serif;">
+  <text x="480" y="38" fill="#f8fafc" font-size="20" font-weight="700" text-anchor="middle">VOID PERSISTENT MEMORY &amp; 7-DAY HIGH THOUGHT RETENTION</text>
+  <text x="480" y="60" fill="#94a3b8" font-size="12" text-anchor="middle">1.5GB NVMe Ring Buffer + 7-Day Rolling Thought Retention (168h) + Weekly Digest Synthesis</text>
+
+  <!-- Left: 1.5GB Facts Engine -->
+  <rect x="50" y="95" width="270" height="380" rx="10" fill="#1e293b" stroke="#38bdf8"/>
+  <text x="185" y="125" fill="#38bdf8" font-size="14" font-weight="700" text-anchor="middle">1.5 GB NVMe FACTS ENGINE</text>
+  <text x="185" y="145" fill="#94a3b8" font-size="11" text-anchor="middle">Persistent User Facts &amp; Context</text>
+
+  <rect x="70" y="165" width="230" height="60" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="185" y="190" fill="#f8fafc" font-size="11" font-weight="600" text-anchor="middle">facts.json Storage</text>
+  <text x="185" y="208" fill="#94a3b8" font-size="10" text-anchor="middle">Categorized user preferences &amp; facts</text>
+
+  <rect x="70" y="240" width="230" height="60" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="185" y="265" fill="#f8fafc" font-size="11" font-weight="600" text-anchor="middle">Automatic Ring Buffer</text>
+  <text x="185" y="283" fill="#94a3b8" font-size="10" text-anchor="middle">1500 MB Max / 1200 MB LRU Prune</text>
+
+  <rect x="70" y="315" width="230" height="60" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="185" y="340" fill="#f8fafc" font-size="11" font-weight="600" text-anchor="middle">Fast-Path Commands</text>
+  <text x="185" y="358" fill="#94a3b8" font-size="10" text-anchor="middle">'Remember that...', 'Recall...', 'Memory status'</text>
+
+  <rect x="70" y="390" width="230" height="60" rx="6" fill="#0f172a" stroke="#22c55e"/>
+  <text x="185" y="415" fill="#4ade80" font-size="11" font-weight="600" text-anchor="middle">16-Turn Context Window</text>
+  <text x="185" y="433" fill="#94a3b8" font-size="10" text-anchor="middle">Pronoun &amp; multi-turn continuity</text>
+
+  <!-- Center: 7-Day High Memory Thoughts -->
+  <rect x="345" y="95" width="270" height="380" rx="10" fill="#1e293b" stroke="#a855f7" stroke-width="1.5"/>
+  <text x="480" y="125" fill="#c084fc" font-size="14" font-weight="700" text-anchor="middle">7-DAY HIGH THOUGHT POOL</text>
+  <text x="480" y="145" fill="#94a3b8" font-size="11" text-anchor="middle">168-Hour Rolling Episodic Traces</text>
+
+  <rect x="365" y="165" width="230" height="60" rx="6" fill="#0f172a" stroke="#a855f7"/>
+  <text x="480" y="190" fill="#ffffff" font-size="11" font-weight="600" text-anchor="middle">weekly_episodes.jsonl</text>
+  <text x="480" y="208" fill="#e9d5ff" font-size="10" text-anchor="middle">Stores reasoning, goals, plan IDs, artifacts</text>
+
+  <rect x="365" y="240" width="230" height="60" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="480" y="265" fill="#f8fafc" font-size="11" font-weight="600" text-anchor="middle">Time Window Pruning</text>
+  <text x="480" y="283" fill="#94a3b8" font-size="10" text-anchor="middle">cutoff = now - 604,800 seconds</text>
+
+  <rect x="365" y="315" width="230" height="60" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="480" y="340" fill="#f8fafc" font-size="11" font-weight="600" text-anchor="middle">Full Agentic Tracking</text>
+  <text x="480" y="358" fill="#94a3b8" font-size="10" text-anchor="middle">Logs every specialist action &amp; deliverable</text>
+
+  <rect x="365" y="390" width="230" height="60" rx="6" fill="#0f172a" stroke="#f59e0b"/>
+  <text x="480" y="415" fill="#fbbf24" font-size="11" font-weight="600" text-anchor="middle">Deep Contextual Retrieval</text>
+  <text x="480" y="433" fill="#94a3b8" font-size="10" text-anchor="middle">'What did we do this week?' / Recap</text>
+
+  <!-- Right: Weekly Digest Synthesis -->
+  <rect x="640" y="95" width="270" height="380" rx="10" fill="#1e293b" stroke="#10b981"/>
+  <text x="775" y="125" fill="#34d399" font-size="14" font-weight="700" text-anchor="middle">WEEKLY DIGEST SYNTHESIZER</text>
+  <text x="775" y="145" fill="#94a3b8" font-size="11" text-anchor="middle">Structured &amp; Human-Readable Digests</text>
+
+  <rect x="660" y="165" width="230" height="75" rx="6" fill="#0f172a" stroke="#10b981"/>
+  <text x="775" y="190" fill="#34d399" font-size="11" font-weight="700" text-anchor="middle">weekly_memory_YYYY_WW.json</text>
+  <text x="775" y="208" fill="#94a3b8" font-size="10" text-anchor="middle">Activity by day, topics covered,</text>
+  <text x="775" y="222" fill="#94a3b8" font-size="10" text-anchor="middle">complete array of created deliverables</text>
+
+  <rect x="660" y="255" width="230" height="85" rx="6" fill="#0f172a" stroke="#10b981"/>
+  <text x="775" y="280" fill="#34d399" font-size="11" font-weight="700" text-anchor="middle">weekly_memory_YYYY_WW.md</text>
+  <text x="775" y="298" fill="#94a3b8" font-size="10" text-anchor="middle">1. Executive Summary &amp; Highlights</text>
+  <text x="775" y="313" fill="#94a3b8" font-size="10" text-anchor="middle">2. Deliverables &amp; Files Created</text>
+  <text x="775" y="328" fill="#94a3b8" font-size="10" text-anchor="middle">3. Chronological Thought Traces</text>
+
+  <rect x="660" y="355" width="230" height="60" rx="6" fill="#0f172a" stroke="#0284c7"/>
+  <text x="775" y="380" fill="#38bdf8" font-size="11" font-weight="600" text-anchor="middle">Zero Data Corruption</text>
+  <text x="775" y="398" fill="#94a3b8" font-size="10" text-anchor="middle">Strict isolation from legacy facts.json</text>
+</svg></div>
+
+<p>VOID implements a tiered memory architecture (<code>agentic/memory.py</code>):</p>
+<ol>
+<li><strong>1.5 GB NVMe Persistent Facts Memory (<code>memory/facts.json</code>):</strong> Ring buffer storing user preferences, identity facts, and project notes with LRU pruning at 1.2 GB.</li>
+<li><strong>7-Day Rolling High-Memory Thought Pool (<code>memory/weekly_episodes.jsonl</code>):</strong> Records reasoning traces, user goals, plans, outcomes, and artifacts over a rolling 168-hour (604,800s) window.</li>
+<li><strong>Weekly Digest Synthesizer:</strong> On command (<em>"generate weekly memory"</em>), VOID analyzes the past 7 days and synthesizes:</li>
+<li><code>weekly_memory_&lt;YYYY_WW&gt;.json</code>: Complete machine-readable digest with activity distributions.</li>
+<li><code>weekly_memory_&lt;YYYY_WW&gt;.md</code>: Formatted executive digest with highlights, deliverables, and chronological thought logs.</li>
+<li><strong>Deep Contextual Retrieval:</strong> Users can query past activity (<em>"What did we do this week?"</em>), and VOID retrieves matching thought traces and file deliverables.</li>
+</ol>
+<hr />
+<h1 id="chapter-20-permission-and-security-architecture">CHAPTER 20: Permission and Security Architecture</h1>
+<div class="diagram-container"><div class="diagram-caption">Figure: 09 Permission Approval Workflow</div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="100%" height="100%" style="background:#0f172a; font-family:'Inter',system-ui,sans-serif;">
+  <text x="480" y="38" fill="#f8fafc" font-size="20" font-weight="700" text-anchor="middle">VOID 4-TIER SECURITY &amp; APPROVAL QUEUE WORKFLOW</text>
+  <text x="480" y="60" fill="#94a3b8" font-size="12" text-anchor="middle">Zero-Unrestricted-Execution Policy with Interactive Human-in-the-Loop Gating</text>
+
+  <!-- Incoming Tool Request -->
+  <rect x="360" y="85" width="240" height="45" rx="8" fill="#1e293b" stroke="#38bdf8"/>
+  <text x="480" y="112" fill="#38bdf8" font-size="13" font-weight="700" text-anchor="middle">TOOL EXECUTION REQUEST</text>
+
+  <line x1="480" y1="130" x2="480" y2="155" stroke="#38bdf8" stroke-width="2"/>
+
+  <!-- Evaluator Diamond -->
+  <polygon points="480,155 580,205 480,255 380,205" fill="#0f172a" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="480" y="200" fill="#fbbf24" font-size="11" font-weight="700" text-anchor="middle">EVALUATE</text>
+  <text x="480" y="215" fill="#94a3b8" font-size="10" text-anchor="middle">PERMISSION</text>
+
+  <!-- Branch 1: Level 4 Forbidden -->
+  <line x1="380" y1="205" x2="160" y2="205" stroke="#f43f5e" stroke-width="1.5"/>
+  <line x1="160" y1="205" x2="160" y2="265" stroke="#f43f5e" stroke-width="1.5"/>
+  <rect x="60" y="265" width="200" height="80" rx="8" fill="#1e293b" stroke="#f43f5e"/>
+  <text x="160" y="292" fill="#fb7185" font-size="12" font-weight="700" text-anchor="middle">LEVEL 4: FORBIDDEN</text>
+  <text x="160" y="310" fill="#94a3b8" font-size="10" text-anchor="middle">sudo, su, /etc, /root, /boot</text>
+  <text x="160" y="325" fill="#ef4444" font-size="10" font-weight="600" text-anchor="middle">➔ Immediate Hard Abort</text>
+
+  <!-- Branch 2: Level 1 & 2 Auto -->
+  <line x1="480" y1="255" x2="480" y2="320" stroke="#10b981" stroke-width="1.5"/>
+  <rect x="360" y="320" width="240" height="75" rx="8" fill="#1e293b" stroke="#10b981"/>
+  <text x="480" y="345" fill="#34d399" font-size="12" font-weight="700" text-anchor="middle">LEVEL 1 &amp; 2: AUTO-APPROVED</text>
+  <text x="480" y="363" fill="#94a3b8" font-size="10" text-anchor="middle">Read-only / Reversible in ~/Documents</text>
+  <text x="480" y="378" fill="#10b981" font-size="10" font-weight="600" text-anchor="middle">➔ Sandboxed Execution</text>
+
+  <!-- Branch 3: Level 3 Approval Queue -->
+  <line x1="580" y1="205" x2="800" y2="205" stroke="#eab308" stroke-width="1.5"/>
+  <line x1="800" y1="205" x2="800" y2="265" stroke="#eab308" stroke-width="1.5"/>
+  <rect x="700" y="265" width="200" height="80" rx="8" fill="#1e293b" stroke="#eab308"/>
+  <text x="800" y="292" fill="#facc15" font-size="12" font-weight="700" text-anchor="middle">LEVEL 3: APPROVAL REQ.</text>
+  <text x="800" y="310" fill="#94a3b8" font-size="10" text-anchor="middle">Modifies existing project files</text>
+  <text x="800" y="325" fill="#f59e0b" font-size="10" font-weight="600" text-anchor="middle">➔ Holds in Approval Queue</text>
+
+  <!-- Interactive Human In The Loop -->
+  <line x1="800" y1="345" x2="800" y2="410" stroke="#eab308" stroke-width="1.5"/>
+  <rect x="680" y="410" width="240" height="75" rx="8" fill="#0f172a" stroke="#38bdf8"/>
+  <text x="800" y="435" fill="#38bdf8" font-size="12" font-weight="700" text-anchor="middle">HUMAN-IN-THE-LOOP</text>
+  <text x="800" y="453" fill="#94a3b8" font-size="10" text-anchor="middle">Voice or Widget Card Prompt</text>
+  <text x="800" y="468" fill="#4ade80" font-size="10" text-anchor="middle">User Approves or Rejects</text>
+
+  <!-- Audit trail footer -->
+  <rect x="60" y="415" width="540" height="70" rx="8" fill="#0f172a" stroke="#334155"/>
+  <text x="330" y="440" fill="#f8fafc" font-size="12" font-weight="600" text-anchor="middle">IMMUTABLE AUDIT LOGGING</text>
+  <text x="330" y="458" fill="#94a3b8" font-size="10" text-anchor="middle">Every permission evaluation, approval, and rejected action is recorded</text>
+  <text x="330" y="472" fill="#64748b" font-size="9" text-anchor="middle">with timestamps and masked parameters in logs/agentic_audit.jsonl</text>
+</svg></div>
+<div class="diagram-container"><div class="diagram-caption">Figure: 12 Failure Recovery Workflow</div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="100%" height="100%" style="background:#0f172a; font-family:'Inter',system-ui,sans-serif;">
+  <text x="480" y="38" fill="#f8fafc" font-size="20" font-weight="700" text-anchor="middle">VOID FAILURE DETECTION, RECOVERY &amp; REPLANNING ENGINE</text>
+  <text x="480" y="60" fill="#94a3b8" font-size="12" text-anchor="middle">Bounded Retries (Max 2) + Alternative Strategy Formulation + Graceful Rollback Protection</text>
+
+  <!-- Task Failure Event -->
+  <rect x="60" y="95" width="230" height="80" rx="8" fill="#1e293b" stroke="#f43f5e" stroke-width="1.5"/>
+  <text x="175" y="125" fill="#fb7185" font-size="13" font-weight="700" text-anchor="middle">TASK FAILURE DETECTED</text>
+  <text x="175" y="145" fill="#94a3b8" font-size="10" text-anchor="middle">Non-zero exit code / Exception</text>
+  <text x="175" y="160" fill="#64748b" font-size="9" text-anchor="middle">or Verifier rejection</text>
+
+  <line x1="290" y1="135" x2="340" y2="135" stroke="#f43f5e" stroke-width="2"/>
+
+  <!-- Recovery Agent Analysis -->
+  <rect x="340" y="95" width="280" height="80" rx="8" fill="#1e293b" stroke="#a855f7" stroke-width="1.5"/>
+  <text x="480" y="125" fill="#c084fc" font-size="13" font-weight="700" text-anchor="middle">RECOVERY AGENT CLASSIFIER</text>
+  <text x="480" y="145" fill="#94a3b8" font-size="10" text-anchor="middle">Inspects stderr, exit code &amp; plan context</text>
+  <text x="480" y="160" fill="#f59e0b" font-size="10" text-anchor="middle">Checks: retry_count &lt; max_retries (2)</text>
+
+  <line x1="620" y1="135" x2="670" y2="135" stroke="#38bdf8" stroke-width="2"/>
+
+  <!-- Decision Fork -->
+  <rect x="670" y="95" width="230" height="80" rx="8" fill="#1e293b" stroke="#38bdf8"/>
+  <text x="785" y="125" fill="#38bdf8" font-size="13" font-weight="700" text-anchor="middle">STRATEGY SELECTION</text>
+  <text x="785" y="145" fill="#94a3b8" font-size="10" text-anchor="middle">• Alternative tool parameters</text>
+  <text x="785" y="160" fill="#94a3b8" font-size="10" text-anchor="middle">• Fallback tool substitution</text>
+
+  <!-- Loop Path 1: Under Bound (Retry) -->
+  <path d="M 785 175 L 785 240 L 480 240 L 480 270" stroke="#eab308" stroke-width="2" fill="none"/>
+  <rect x="350" y="270" width="260" height="90" rx="8" fill="#0f172a" stroke="#eab308"/>
+  <text x="480" y="300" fill="#facc15" font-size="12" font-weight="700" text-anchor="middle">BOUNDED RETRY (Attempt &lt;= 2)</text>
+  <text x="480" y="322" fill="#94a3b8" font-size="10" text-anchor="middle">Applies alternative arguments &amp; re-executes</text>
+  <text x="480" y="340" fill="#4ade80" font-size="10" text-anchor="middle">Logs recovery checkpoint to audit trail</text>
+
+  <!-- Loop Path 2: Exceeded Bound (Safe Abort) -->
+  <path d="M 850 175 L 850 270" stroke="#f43f5e" stroke-width="2" fill="none"/>
+  <rect x="720" y="270" width="210" height="90" rx="8" fill="#0f172a" stroke="#f43f5e"/>
+  <text x="825" y="300" fill="#fb7185" font-size="12" font-weight="700" text-anchor="middle">BOUND EXCEEDED (Attempt &gt; 2)</text>
+  <text x="825" y="322" fill="#94a3b8" font-size="10" text-anchor="middle">Marks task as ABORTED</text>
+  <text x="825" y="340" fill="#ef4444" font-size="10" text-anchor="middle">Prevents infinite looping</text>
+
+  <!-- Bottom Safety Isolation Summary -->
+  <rect x="60" y="395" width="840" height="95" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+  <text x="480" y="425" fill="#34d399" font-size="13" font-weight="700" text-anchor="middle">CRITICAL FAULT ISOLATION GUARANTEE</text>
+  <text x="480" y="450" fill="#f8fafc" font-size="11" text-anchor="middle">An unhandled agent crash or tool failure NEVER brings down the VOID desktop assistant,</text>
+  <text x="480" y="468" fill="#94a3b8" font-size="10" text-anchor="middle">the voice pipeline, or Fedora desktop services. VOID gracefully falls back to deterministic voice interaction.</text>
+</svg></div>
+
+<p>Security is central to VOID's architecture (<code>agentic/permissions.py</code>):</p>
+<ul>
+<li><strong>Level 1 (Read-Only):</strong> Safe inspection commands (<code>df</code>, <code>uptime</code>, <code>ss</code>, <code>read_file</code>) auto-approve without side-effects.</li>
+<li><strong>Level 2 (Reversible User Action):</strong> File creation and editing strictly confined to user workspaces (<code>~/Documents/Reports</code>, <code>~/Documents/Notes</code>, <code>~/Documents/Projects</code>).</li>
+<li><strong>Level 3 (Approval Required):</strong> System configuration changes or package installations held in <code>ApprovalQueue</code> awaiting human confirmation.</li>
+<li><strong>Level 4 (Strictly Forbidden):</strong> Destructive operations (<code>sudo</code>, <code>su</code>, <code>rm -rf /</code>, <code>/etc</code>, <code>/boot</code>, <code>/root</code>) are blocked with immediate rejection.</li>
+<li><strong>Audit Logging:</strong> Every permission evaluation and tool call is recorded in <code>logs/agentic_audit.jsonl</code> with masked secrets.</li>
+</ul>
+<hr />
+<h1 id="chapter-21-void-glass-flow-ui">CHAPTER 21: VOID Glass Flow UI</h1>
+<div class="diagram-container"><div class="diagram-caption">Figure: 10 Ui Agent Communication</div><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="100%" height="100%" style="background:#0f172a; font-family:'Inter',system-ui,sans-serif;">
+  <text x="480" y="38" fill="#f8fafc" font-size="20" font-weight="700" text-anchor="middle">VOID GLASS FLOW UI &amp; AGENT VISUAL COMMUNICATION</text>
+  <text x="480" y="60" fill="#94a3b8" font-size="12" text-anchor="middle">Wayland Acrylic Glass Card + 3D Fibonacci Neural Constellation Orb + Live DAG State Visualizer</text>
+
+  <!-- UI Card Layout Preview -->
+  <rect x="50" y="90" width="400" height="390" rx="16" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+  <rect x="50" y="90" width="400" height="42" rx="16" fill="#0f172a"/>
+  <text x="250" y="116" fill="#38bdf8" font-size="13" font-weight="700" text-anchor="middle">VOID GLASS ISLAND INTERFACE (Wayland Acrylic)</text>
+
+  <!-- Orb representation -->
+  <circle cx="110" cy="180" r="35" fill="#0284c7" opacity="0.4"/>
+  <circle cx="110" cy="180" r="25" fill="#06b6d4" opacity="0.8"/>
+  <circle cx="110" cy="180" r="15" fill="#ffffff" opacity="0.9"/>
+  <text x="110" y="235" fill="#22d3ee" font-size="10" font-weight="600" text-anchor="middle">3D Neural Orb</text>
+  <text x="110" y="250" fill="#64748b" font-size="9" text-anchor="middle">Fibonacci Lattice</text>
+
+  <!-- Capsule states -->
+  <rect x="170" y="150" width="250" height="40" rx="8" fill="#0f172a" stroke="#334155"/>
+  <text x="180" y="174" fill="#f8fafc" font-size="11" font-weight="600">Status: Ready (Listening)</text>
+
+  <rect x="170" y="200" width="250" height="65" rx="8" fill="#0f172a" stroke="#334155"/>
+  <text x="180" y="222" fill="#38bdf8" font-size="10" font-weight="600">Query:</text>
+  <text x="180" y="238" fill="#94a3b8" font-size="10">"Analyze system performance and report"</text>
+  <text x="180" y="254" fill="#a855f7" font-size="9">Badge: Linux Intelligence</text>
+
+  <!-- Live Agent Activity Panel -->
+  <rect x="70" y="285" width="360" height="175" rx="8" fill="#0f172a" stroke="#38bdf8"/>
+  <text x="250" y="310" fill="#38bdf8" font-size="11" font-weight="700" text-anchor="middle">AGENT ACTIVITY CARD (Live Multi-Agent DAG)</text>
+
+  <rect x="85" y="325" width="330" height="35" rx="4" fill="#1e293b" stroke="#22c55e"/>
+  <text x="95" y="347" fill="#4ade80" font-size="10">✔ T1: inspect_system_vitals [LinuxAgent] - 0.05s</text>
+
+  <rect x="85" y="365" width="330" height="35" rx="4" fill="#1e293b" stroke="#38bdf8"/>
+  <text x="95" y="387" fill="#38bdf8" font-size="10">⚙ T2: create_docx_report [ResearchAgent] - Running</text>
+
+  <rect x="85" y="405" width="330" height="35" rx="4" fill="#1e293b" stroke="#64748b"/>
+  <text x="95" y="427" fill="#94a3b8" font-size="10">⏳ T3: verify_ground_truth [VerifierAgent] - Pending</text>
+
+  <!-- Right: Visual State Mapping -->
+  <rect x="490" y="90" width="420" height="390" rx="16" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <rect x="490" y="90" width="420" height="42" rx="16" fill="#0f172a"/>
+  <text x="700" y="116" fill="#f8fafc" font-size="13" font-weight="700" text-anchor="middle">ORB VISUAL STATE SYNCHRONIZATION</text>
+
+  <rect x="515" y="150" width="370" height="45" rx="6" fill="#0f172a" stroke="#06b6d4"/>
+  <text x="535" y="177" fill="#22d3ee" font-size="12" font-weight="700">IDLE STATE (Cyan)</text>
+  <text x="730" y="177" fill="#94a3b8" font-size="11">Gentle breathing rotation</text>
+
+  <rect x="515" y="205" width="370" height="45" rx="6" fill="#0f172a" stroke="#a855f7"/>
+  <text x="535" y="232" fill="#c084fc" font-size="12" font-weight="700">PLANNING STATE (Purple)</text>
+  <text x="730" y="232" fill="#94a3b8" font-size="11">Pulse lattice contraction</text>
+
+  <rect x="515" y="260" width="370" height="45" rx="6" fill="#0f172a" stroke="#38bdf8"/>
+  <text x="535" y="287" fill="#38bdf8" font-size="12" font-weight="700">EXECUTING STATE (Deep Blue)</text>
+  <text x="730" y="287" fill="#94a3b8" font-size="11">Rapid orbital precession</text>
+
+  <rect x="515" y="315" width="370" height="45" rx="6" fill="#0f172a" stroke="#22c55e"/>
+  <text x="535" y="342" fill="#4ade80" font-size="12" font-weight="700">SPEAKING STATE (Emerald)</text>
+  <text x="730" y="342" fill="#94a3b8" font-size="11">Dynamic audio-reactive pulse</text>
+
+  <rect x="515" y="370" width="370" height="45" rx="6" fill="#0f172a" stroke="#eab308"/>
+  <text x="535" y="397" fill="#facc15" font-size="12" font-weight="700">APPROVAL STATE (Gold)</text>
+  <text x="730" y="397" fill="#94a3b8" font-size="11">Interactive confirmation pill</text>
+
+  <rect x="515" y="425" width="370" height="45" rx="6" fill="#0f172a" stroke="#f43f5e"/>
+  <text x="535" y="452" fill="#fb7185" font-size="12" font-weight="700">RECOVERY STATE (Coral/Amber)</text>
+  <text x="730" y="452" fill="#94a3b8" font-size="11">Retry &amp; recovery warning</text>
+</svg></div>
+<div class="screenshot-gallery"><div class="screenshot-box"><img src="data:image/png;base64,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" class="screenshot-img"/><div class="screenshot-caption">Globe Idle</div></div><div class="screenshot-box"><img src="data:image/png;base64,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" class="screenshot-img"/><div class="screenshot-caption">Globe Thinking</div></div><div class="screenshot-box"><img src="data:image/png;base64,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" class="screenshot-img"/><div class="screenshot-caption">Globe Executing</div></div><div class="screenshot-box"><img src="data:image/png;base64,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" class="screenshot-img"/><div class="screenshot-caption">Glass Effect Verified</div></div><div class="screenshot-box"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXIAAAEJCAYAAACJwawLAAAACXBIWXMAAA7EAAAOxAGVKw4bAAALqUlEQVR4nO3dW4xd1XnA8bX22XPz4LHxbQDjsbnULoaJnUKCXIPBJBVS+kBDIzWtVQkF9SFSVEWKelGTh0hNG7USStNGylNSpAqpSJXaVCppE0poSiEmBAzGJoRgjA0OvmKPPczt7L36MDblYhtbJQyf+P0kS9Y5x3uWX/5a+vbaZ3I6T/e91M0p55HStr92Ymxs9dTExEVNd2ZZKWlRSqU63+sBfDDlNud0pFP3HOgbGHjlgqGhn+WqejyVsucTl9blvK50rh/8573Ngu701CdePXDg1hPHjl7286e29b686/k0PnZsZvbPWLdtmvP64QAfVFWnkweHhurBoQU9g0MLepZfcWW6cnTd9AULFu66cNmy79W9ffd9ckXn2Llc6x1D/o+7u33dmZlbD7605zM7tz48vOOR/5nY9dS2scnXxpt35X8DQEoppf55g53LP7R+6OoNGwfWXv/r+5deOvLtuqfnPz69qp462787a8jv3tW9/ODeF7/08yceW/Pwd/7pxJ6dT59411cOwNusXDs6f8Ntvz145Yeve3bpipVfuePyeteZPnvGkH/z2anr9/3smS8+eM+3Fzz14PcPpmJqAvCeyjl96ObfWHrzls8cu2T1VX/x2TV9W0/7sdO9+Nfbjv3m3u1PfP4/v/WN5uVnnj7+S18sAGe0/Kpr5n/szs91Vox++G/+eP2Cf3vr+28L+V9un/zI7sce+cq/f+3PJ4+9su+scxkA3hsLL17ef+vnv9S36roNX/yz0f7H3vjem0L+5adnVu7bse2uB7/x1Xn7n91hHg7wPjK85pr5N3/uT8cvuXr9F758Tc+Lp15/PeR/8uR075Hdz9/16N//7doXHn7g0JytFIAzumzjLUs+escf7ly06oov/NW63umUUqpPvXl8YuqmXY89vPaFRx44mJIbmwDvR7sffuDgkmuuW9szfOmmlNL96VTI7/zx9AW/eHb77z33ve9MpFbEAd6vSinpue//68TQmvVb7vzx9I++9ZHeE3VKKR0fn9i0Z+t/jRzd9dMDc71IAM7u6PPPHN/z6A9HekdW35hS+m5920NT6fALP9104KlHJ5PD4gAhHHxy6+TCj37sptsemvpufaIpFx09uP+Ksed3nlBxgBiOPb/zxNEDr1yRVqy+qD4x3aw+svPx+e3ka4fnemEAnJt28rXukZ2PL65HN66uu4cPjEzv252ToyoAoUzve7HqHjm4ouoeP7a0GT/enesFAXB+mvHjM91jR5fV7WvjS5rxsZlU3OgEiKQZH5tpJ15bXJfpmYXNxPhMMVoBCKWZODFTpqcvrEvT5NR0dRwgmqZbStPkujRtKbNjFSUHCKSUUkrTljo1bZtKKWbkAMGUUlLTtnXpNrMZtyMHCKWUVEq3KVVpWw0HCKmk0ralLt22pNZoBSCctpTSbUudmqac/LIsIQcIpZTUNKUu3bbVcYCASkml27Z1aZpS2lJKUXKASEpbSmmaUpemPTlaMSMHiGX2HHk1e/xQwwGiKaWk0m1KXbpNSaVUKZVqrhcFwHkos5vxOnWbkmaPkue5XhMA56EtKXWbUrfdJpVUcklCDhBJSSW33SbN7shLm1MqQg4QSWlz6jalLk331FhFyAEiKSmXppvqMtOUUtqcih05QCSltLnMzJ5aae3IAQIqKZdu09al25x6FkjIASKZPUee6tLtutkJEFFpc+l2S11mmlRKcvwQIJhSUi4zTTr1ZGf2QBBAMKXkk4/od2dPrRitAIRS3jBaKU6tAAQ0O1qZ3ZGf/KUSQg4QSkmzO/KeTjUbcaMVgGBy6elUdak7KaXkZidAPLnUnVSXniqX7PghQDQlp1x6qlynnk5O2WgFIJyccurp5Lr0nByt2JEDRJNLTyfVpe7klLOQA0STcy717I48l1R8jS1AMCWVXHo6uU51ZUcOEFHOOdXV7I7cjBwgpNkdeakrp1YAIsopl5M78uQcOUBA+eSplVR3cirZk50A0ZScU/36aKUYrQBEk8vsaCXVndmng4xWAGLJKae6k+rSyTklxw8B4sm5dHKu5noZAPz/CDlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEJyQAwQn5ADBCTlAcEIOEFyVUm5SznmuFwLAeco5p5SbKvX0Hkm9A3bmANH0DVSpp+9wlfsHD+U+IQeIJvcOVLl/8FCVFyzdn4QcIJ6+gU5euHR/lYdXvZQXXTwx1+sB4PzkRReP52UrX65Sp96bV43uSXWvG54AUfT0Vvmy0b2pU++pUkpHqmUjT+ell/bP9boAODd5yYq+atnI9pTSq9XYluFUrb72v6sVv9qd64UBcG6qFWtm8pXXPjS2ZfjkA0ED87dXo5t+lBdf0jvXiwPg7PLiS3qr0U1b87z529OpJzvHtgxPdtbfcm911YapuV4gAGeRc6rWbpjqrL/l3rEtw5PpTY/o9w/u6KzffH+1cu3gXK4RgDOrRtYOdtZtvj/1D+54/bVTfxnbMtyt1m2+u3Pjp36SFy/vm7NVAnBaecnyvs6Nn3qsWrf57rEtw6/f13zTg0BjW4YPdTZ+8uudG25/KV+wsJ6TlQLwNvmChXVn4+0vdTb+1tfHtgwfeuN7nbd+eOpfvvZq/2f/7oVU946WQy8vShPHm/d0tQC8SV6yvK9z06f3dW64/a7jf/Arz7z1/beFPKWUpu/75isDf/QP23LfvJXp2KFV5djBmfdktQD8n5xTtfLqefXHf/+JevPvfvV0EU8ppbM+zTl0z/4l7ZM/uKPZ9oOPt8880lcO75v+pS0YgNflxZf0Vms3THXWbb7/5Ez80Bk/+04XG7pnf50mx69utj3wO+32H17f7n22pxzcO5m60+VdXznAB1ndm/PSFf3VijUz1eimrZ31t9yb+gd3vPHG5umc8/erDN2zvz9NHB9tn/vJDe3+PaNl9/aRcuQX89LURFOmJ9o0NdGmUsQd4FzknFPfQJV7B6rUN9DJiy4ez6tG91bDI9vzldc+lOfN337qnPg7Xup8f/bQPftTSunC1HRHyoEXl5ejB4fL5PiSNDO1OKVy2pk7AG+Vm9TTdzj3Dx7KC5fuz8tWvpw69Z6U0qtjW4bP60r/C8ckpW29KfNCAAAAAElFTkSuQmCC" class="screenshot-img"/><div class="screenshot-caption">Glass Expanded Verified</div></div></div>
+
+<p>The user interface (<code>bin/void-widget.py</code> &amp; <code>agentic/ui_components.py</code>) makes multi-agent execution visible:</p>
+<ul>
+<li><strong>Wayland Acrylic Glass Card:</strong> Frosted-glass floating capsule with non-blocking native Wayland window dragging (<code>startSystemMove()</code>).</li>
+<li><strong>3D Fibonacci Neural Constellation Orb:</strong> Mathematically projected 3D rotating sphere whose visual states dynamically synchronize with agent activity:</li>
+<li><em>Cyan:</em> Idle / Listening</li>
+<li><em>Purple:</em> Planning DAG</li>
+<li><em>Deep Blue:</em> Executing Tools</li>
+<li><em>Emerald Green:</em> Speaking Synthesis</li>
+<li><em>Gold:</em> Awaiting Human Approval</li>
+<li><em>Coral/Amber:</em> Self-Healing Recovery</li>
+<li><strong>Live AgentActivityCard:</strong> Displays active tasks, executing agents, elapsed durations, and status badges in real-time.</li>
+</ul>
+<hr />
+<h1 id="chapter-22-performance-and-reliability">CHAPTER 22: Performance and Reliability</h1>
+<p>Live hardware measurements demonstrate exceptional responsiveness:</p>
+<ul>
+<li><strong>Direct Command Latency:</strong> 3.8 milliseconds (exceeding the sub-5ms target).</li>
+<li><strong>Vosk Wake Detection:</strong> ~120 milliseconds.</li>
+<li><strong>Whisper STT Latency:</strong> ~780 milliseconds.</li>
+<li><strong>Piper TTS Synthesis:</strong> ~240 milliseconds.</li>
+<li><strong>Multi-Agent DAG Execution:</strong> 0.45s to 1.82s depending on workflow complexity.</li>
+<li><strong>Fault Isolation:</strong> Injected task exceptions do not crash the VOID engine or voice listening loop.</li>
+<li><strong>Emergency Abort:</strong> Interruption executes in <code>&lt; 5ms</code>.</li>
+</ul>
+<hr />
+<h1 id="chapter-23-original-function-preservation">CHAPTER 23: Original Function Preservation</h1>
+<p>All 19 original functional categories were verified against the baseline:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Feature Category</th>
+<th style="text-align: left;">Original Status</th>
+<th style="text-align: left;">Upgraded Status</th>
+<th style="text-align: left;">Verification Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Wake-Word Kaldi FST</strong></td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;"><code>test_audio_and_wake_isolation.py</code> (PASS)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Whisper STT (Base int8)</strong></td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;"><code>test_speech_and_system_invariance.py</code> (PASS)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Piper Neural TTS</strong></td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;"><code>test_tts_speed.py</code> (PASS)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>PipeWire Native pw-play</strong></td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;"><code>test_speech_and_system_invariance.py</code> (PASS)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>KWin DBus Controls</strong></td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;"><code>docs/ACTIONS_WITH_AND_WITHOUT_AI.md</code> (PASS)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Application Launcher</strong></td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;"><code>test_universal_open_and_search.py</code> (PASS)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Procfs Vitals Monitor</strong></td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;"><code>test_speech_and_system_invariance.py</code> (PASS)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Universal Media Opener</strong></td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;"><code>test_universal_open_and_search.py</code> (PASS)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>DuckDuckGo Web Search</strong></td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;"><code>test_browser_and_email.py</code> (PASS)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Voice Dictation Engine</strong></td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;"><code>test_dictation_and_documents.py</code> (PASS)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>DOCX Document Generator</strong></td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;"><code>test_dictation_and_documents.py</code> (PASS)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>XLSX Spreadsheet Engine</strong></td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;"><code>test_dictation_and_documents.py</code> (PASS)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Chromium Gmail Webmail</strong></td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;"><code>test_browser_and_email.py</code> (PASS)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>WhatsApp Web Launcher</strong></td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;"><code>test_dictation_and_documents.py</code> (PASS)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>1.5 GB facts.json Memory</strong></td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;"><code>test_youtube_dictation_and_memory.py</code> (PASS)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Ollama Lifecycle Control</strong></td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;"><code>test_generalised_ollama_commands.py</code> (PASS)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Emergency Abort Engine</strong></td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;"><code>test_extended_acceptance_criteria.py</code> (PASS)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>105 Dodaios Hub Tools</strong></td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;"><code>test_all_tools_and_emotion.py</code> (PASS)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Glass Island &amp; 3D Orb</strong></td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;">Verified</td>
+<td style="text-align: left;"><code>test_glass_rendering.py</code> (PASS)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="chapter-24-readmemd-analysis">CHAPTER 24: README.md Analysis</h1>
+<p>An audit of the root <a href="file:///run/media/prakash/TR_39/VOID/README.md"><code>README.md</code></a> reveals:
+- <strong>Strengths:</strong> Accurately documents Fedora KDE Plasma 6 Wayland architecture, deployment tree, sub-5ms local fast-paths, memory engines, and safety boundaries.
+- <strong>Identified Gap:</strong> Focuses primarily on VOID v1.0 local assistant features; the newly implemented multi-agent DAG engine and 7-day memory synthesis are documented in detail in <code>SETUP.md</code> and this technical dossier.</p>
+<hr />
+<h1 id="chapter-25-setupmd-analysis">CHAPTER 25: SETUP.md Analysis</h1>
+<p>An audit of <a href="file:///run/media/prakash/TR_39/VOID/SETUP.md"><code>SETUP.md</code></a> confirms:
+- <strong>Completeness:</strong> Provides end-to-end user-level installation steps for Fedora packages, Python virtualenvs, Vosk Kaldi wake models, Piper Ryan medium ONNX TTS, and Ollama <code>lfm3-omni:2b</code>.
+- <strong>Command Reference:</strong> Section 9 documents all voice command variations, including 7-day memory commands (<em>"generate weekly memory"</em>, <em>"what did we do this week"</em>), cloud onboarding commands (<em>"connect cloud api"</em>), and competition demos (<em>"demo 1"</em>, <em>"demo 2"</em>, <em>"demo 3"</em>, <em>"demo 4"</em>).
+- <strong>Execution Accuracy:</strong> All listed commands were executed and verified on the host system.</p>
+<hr />
+<h1 id="chapter-26-complete-technology-stack">CHAPTER 26: Complete Technology Stack</h1>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Component</th>
+<th style="text-align: left;">Technology</th>
+<th style="text-align: left;">Version</th>
+<th style="text-align: left;">Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Operating System</strong></td>
+<td style="text-align: left;">Fedora Linux</td>
+<td style="text-align: left;">40+</td>
+<td style="text-align: left;">Primary host desktop environment</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Desktop Shell</strong></td>
+<td style="text-align: left;">KDE Plasma 6</td>
+<td style="text-align: left;">6.0+ (Wayland)</td>
+<td style="text-align: left;">Window manager, KWin DBus scripting</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>UI Framework</strong></td>
+<td style="text-align: left;">PySide6 (Qt for Python)</td>
+<td style="text-align: left;">6.7+</td>
+<td style="text-align: left;">Acrylic glass capsule, 3D math projection</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Wake-Word Engine</strong></td>
+<td style="text-align: left;">Vosk Kaldi</td>
+<td style="text-align: left;">0.3.45</td>
+<td style="text-align: left;">Real-time acoustic stream keyword spotter</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Speech-to-Text</strong></td>
+<td style="text-align: left;">Faster-Whisper</td>
+<td style="text-align: left;">Base int8</td>
+<td style="text-align: left;">Speech recognition on CPU</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Text-to-Speech</strong></td>
+<td style="text-align: left;">Piper Neural TTS</td>
+<td style="text-align: left;">1.2.0</td>
+<td style="text-align: left;">Neural voice synthesis (ONNX)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Audio Server</strong></td>
+<td style="text-align: left;">PipeWire &amp; WirePlumber</td>
+<td style="text-align: left;">1.4 / 0.5</td>
+<td style="text-align: left;">Native Linux audio streaming (<code>pw-play</code>)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Local LLM Engine</strong></td>
+<td style="text-align: left;">Ollama</td>
+<td style="text-align: left;">0.3+</td>
+<td style="text-align: left;">Offline model inference (<code>lfm3-omni:2b</code>)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Local Model</strong></td>
+<td style="text-align: left;">Liquid AI LFM Omni</td>
+<td style="text-align: left;">2B (Q4_K_M)</td>
+<td style="text-align: left;">Cognitive reasoning and tool planning</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Document Tools</strong></td>
+<td style="text-align: left;">python-docx, openpyxl</td>
+<td style="text-align: left;">Latest</td>
+<td style="text-align: left;">Word and Excel report authoring</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Web Scraping</strong></td>
+<td style="text-align: left;">DuckDuckGo Search, httpx</td>
+<td style="text-align: left;">Latest</td>
+<td style="text-align: left;">Live privacy-preserving web research</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Backend Tools Hub</strong></td>
+<td style="text-align: left;">Dodaios</td>
+<td style="text-align: left;">5.0.0</td>
+<td style="text-align: left;">105 desktop automation endpoints</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Testing Engine</strong></td>
+<td style="text-align: left;">Python unittest</td>
+<td style="text-align: left;">3.13</td>
+<td style="text-align: left;">Automated verification and benchmarks</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="chapter-27-complete-feature-satisfaction-matrix">CHAPTER 27: Complete Feature Satisfaction Matrix</h1>
+<p>Audited across all 81 individual features in <code>VOID_Feature_Satisfaction_Matrix.xlsx</code>:
+- <strong>Fully Satisfied:</strong> 80 features (98.8%)
+- <strong>Partially Satisfied:</strong> 1 feature (1.2% - README documentation update)
+- <strong>Unsatisfied:</strong> 0 features (0.0%)</p>
+<hr />
+<h1 id="chapter-28-testing-and-validation">CHAPTER 28: Testing and Validation</h1>
+<ul>
+<li><strong>Original Baseline:</strong> 12 test suites, 94 passing tests.</li>
+<li><strong>Current Baseline:</strong> <strong>18 test suites, 135 individual passing tests, 0 failures.</strong></li>
+<li><strong>Net Improvement:</strong> +6 new test suites, +41 new individual tests.</li>
+<li><strong>Test Categories:</strong> Unit tests, integration workflows, hardware invariance checks, permission gating, audio isolation, and regression prevention.</li>
+</ul>
+<hr />
+<h1 id="chapter-29-before-and-after-comparison">CHAPTER 29: Before-and-After Comparison</h1>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Dimension</th>
+<th style="text-align: left;">Before Upgrade (VOID v1.0)</th>
+<th style="text-align: left;">After Upgrade (VOID v2.0 Agentic OS)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>System Identity</strong></td>
+<td style="text-align: left;">Fast voice assistant with local LLM</td>
+<td style="text-align: left;">Multi-agent autonomous desktop operating system</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Task Execution</strong></td>
+<td style="text-align: left;">Single-step regex or iterative prompt loop</td>
+<td style="text-align: left;">Hierarchical Directed Acyclic Graph (DAG)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Specialization</strong></td>
+<td style="text-align: left;">General model handled all tasks</td>
+<td style="text-align: left;">7 specialized agents with distinct roles</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Verification</strong></td>
+<td style="text-align: left;">Assumed success from LLM reply</td>
+<td style="text-align: left;">Independent Verifier inspecting exit codes &amp; files</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Error Handling</strong></td>
+<td style="text-align: left;">Threw unhandled exception or halted</td>
+<td style="text-align: left;">Recovery Agent with bounded retries (max 2)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Security</strong></td>
+<td style="text-align: left;">Basic path matching</td>
+<td style="text-align: left;">4-tier security doctrine with approval queue</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Memory</strong></td>
+<td style="text-align: left;">Static facts.json</td>
+<td style="text-align: left;">7-day rolling thought retention &amp; weekly digests</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Cloud Resilience</strong></td>
+<td style="text-align: left;">Offline deadlock if Ollama stopped</td>
+<td style="text-align: left;">Proactive cloud onboarding with secret masking</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>UI Transparency</strong></td>
+<td style="text-align: left;">Static orb color states</td>
+<td style="text-align: left;">Live AgentActivityCard DAG visualizer</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="chapter-30-competition-requirement-mapping">CHAPTER 30: Competition Requirement Mapping</h1>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Competition Criteria</th>
+<th style="text-align: left;">VOID Capability</th>
+<th style="text-align: left;">Verification Evidence</th>
+<th style="text-align: left;">Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Goal Understanding</strong></td>
+<td style="text-align: left;">Decomposes high-level requests into tasks</td>
+<td style="text-align: left;"><code>PlannerAgent.create_plan()</code></td>
+<td style="text-align: left;"><strong>Satisfied</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Multi-Agent Collaboration</strong></td>
+<td style="text-align: left;">Dispatches to specialized agents</td>
+<td style="text-align: left;"><code>SupervisorAgent.execute_goal()</code></td>
+<td style="text-align: left;"><strong>Satisfied</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Real Tool Interaction</strong></td>
+<td style="text-align: left;">Interacts with filesystem, DBus, sockets</td>
+<td style="text-align: left;"><code>ToolRegistry</code> (16 native + 105 hub)</td>
+<td style="text-align: left;"><strong>Satisfied</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Ground-Truth Verification</strong></td>
+<td style="text-align: left;">Validates physical files and exit codes</td>
+<td style="text-align: left;"><code>VerifierAgent.verify_task()</code></td>
+<td style="text-align: left;"><strong>Satisfied</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Failure Recovery</strong></td>
+<td style="text-align: left;">Bounded retries and replanning</td>
+<td style="text-align: left;"><code>RecoveryAgent.handle_failure()</code></td>
+<td style="text-align: left;"><strong>Satisfied</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Permission Gating</strong></td>
+<td style="text-align: left;">Level 3 approval queue for modifications</td>
+<td style="text-align: left;"><code>PermissionManager</code> (Demos 1-4)</td>
+<td style="text-align: left;"><strong>Satisfied</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Persistent Task Memory</strong></td>
+<td style="text-align: left;">7-day rolling window &amp; weekly digest</td>
+<td style="text-align: left;"><code>AgentMemoryManager</code></td>
+<td style="text-align: left;"><strong>Satisfied</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Zero-Regression Guarantee</strong></td>
+<td style="text-align: left;">Sub-5ms direct coexistence preserved</td>
+<td style="text-align: left;">18 test suites, 135/135 tests passed</td>
+<td style="text-align: left;"><strong>Satisfied</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="chapter-31-limitations-and-remaining-work">CHAPTER 31: Limitations and Remaining Work</h1>
+<ol>
+<li><strong>Desktop Environment Specialization:</strong> VOID is deeply integrated with KDE Plasma 6 on Wayland (using KWin DBus). Running on GNOME or XFCE requires implementing corresponding window manager adapters.</li>
+<li><strong>Local Model Parameter Capacity:</strong> The local Liquid AI <code>lfm3-omni:2b</code> model is optimized for low latency and a 1.61 GB memory footprint; extremely complex codebases benefit from routing to larger cloud models via the cloud provider bridge.</li>
+<li><strong>Headless Limitations:</strong> While core agentic workflows execute headlessly, visual Glass Flow UI rendering requires a running Wayland compositor.</li>
+</ol>
+<hr />
+<h1 id="chapter-32-future-development-opportunities">CHAPTER 32: Future Development Opportunities</h1>
+<ol>
+<li><strong>Multi-Modal Vision Integration:</strong> Direct screen capture inspection using local vision-language models for visual GUI automation.</li>
+<li><strong>Distributed Multi-Device Swarm:</strong> Extending the agent protocol across multiple Linux machines on a local network.</li>
+<li><strong>Automated Skill Authoring:</strong> Allowing the Developer Agent to autonomously author, test, and register new tools during runtime.</li>
+</ol>
+<hr />
+<h1 id="chapter-33-final-conclusion">CHAPTER 33: Final Conclusion</h1>
+<p>VOID demonstrates that Agentic AI is not merely a theoretical concept or a simulated dashboard, but a practical, high-performance operating paradigm. By uniting a sub-5ms local fast path with an autonomous multi-agent DAG core, independent ground-truth verification, 4-tier security gating, and 7-day high-memory retention, VOID establishes a new benchmark for Linux desktop intelligence. The system is fully implemented, verified across 135 automated tests, and ready for presentation at the <strong>AI for Future Workforce Agentic AI Bootcamp 2026</strong>.</p>
+<hr />
+<h1 id="chapter-34-technical-appendix">CHAPTER 34: Technical Appendix</h1>
+<h3 id="key-system-paths">Key System Paths</h3>
+<ul>
+<li><strong>Repository Root:</strong> <code>/run/media/prakash/TR_39/VOID</code></li>
+<li><strong>Agentic Package:</strong> <code>/run/media/prakash/TR_39/VOID/agentic/</code></li>
+<li><strong>Application Entry Point:</strong> <code>/run/media/prakash/TR_39/VOID/bin/void-widget.py</code></li>
+<li><strong>Launcher Daemon:</strong> <code>/run/media/prakash/TR_39/VOID/bin/void-launcher.py</code></li>
+<li><strong>Persistent Facts:</strong> <code>/run/media/prakash/TR_39/VOID/memory/facts.json</code></li>
+<li><strong>7-Day Rolling Episodes:</strong> <code>/run/media/prakash/TR_39/VOID/memory/weekly_episodes.jsonl</code></li>
+<li><strong>Weekly Summaries:</strong> <code>/run/media/prakash/TR_39/VOID/memory/weekly_summaries/</code></li>
+<li><strong>Audit Logs:</strong> <code>/run/media/prakash/TR_39/VOID/logs/agentic_audit.jsonl</code></li>
+<li><strong>User Deliverables:</strong> <code>~/Documents/Reports/</code> and <code>~/Documents/Projects/</code></li>
+</ul>
+<hr />
+<h1 id="chapter-35-setup-and-execution-reference">CHAPTER 35: Setup and Execution Reference</h1>
+<pre><code class="language-bash"># 1. Activate Environment
+source /home/prakash/.dodaios/.venv/bin/activate
+
+# 2. Launch VOID Desktop Assistant
+/run/media/prakash/TR_39/VOID/scripts/run_void.sh
+
+# 3. Execute Complete Test Matrix
+python3 /run/media/prakash/TR_39/VOID/scripts/test_weekly_memory_and_cloud.py
+python3 /run/media/prakash/TR_39/VOID/scripts/test_multi_agent_system.py
+python3 /run/media/prakash/TR_39/VOID/scripts/test_extended_acceptance_criteria.py
+
+# 4. Trigger Autonomous Demos (Voice or Text)
+# &quot;Run Agentic Demo 1&quot; -&gt; Linux Diagnostics Audit
+# &quot;Run Agentic Demo 2&quot; -&gt; TDD Scaffolding &amp; PyTest
+# &quot;Run Agentic Demo 3&quot; -&gt; Deep Web Research &amp; DOCX
+# &quot;Run Agentic Demo 4&quot; -&gt; Level 3 Permission Gating
+</code></pre>
+</body>
+</html>

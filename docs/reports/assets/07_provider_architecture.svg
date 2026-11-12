@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="100%" height="100%" style="background:#0f172a; font-family:'Inter',system-ui,sans-serif;">
+  <text x="480" y="38" fill="#f8fafc" font-size="20" font-weight="700" text-anchor="middle">VOID AI PROVIDER &amp; INFERENCE ROUTING ARCHITECTURE</text>
+  <text x="480" y="60" fill="#94a3b8" font-size="12" text-anchor="middle">Local Ollama Engine + Proactive Cloud AI Onboarding Fallback + Hybrid Task Router</text>
+
+  <!-- Router Box -->
+  <rect x="330" y="90" width="300" height="80" rx="10" fill="#1e293b" stroke="#a855f7" stroke-width="1.5"/>
+  <text x="480" y="120" fill="#c084fc" font-size="14" font-weight="700" text-anchor="middle">AI PROVIDER MANAGER</text>
+  <text x="480" y="140" fill="#94a3b8" font-size="11" text-anchor="middle">Modes: 'local' (default) | 'cloud' | 'hybrid'</text>
+  <text x="480" y="155" fill="#64748b" font-size="10" text-anchor="middle">Sensitive tasks strictly routed locally</text>
+
+  <!-- Left: Local Mode -->
+  <line x1="400" y1="170" x2="220" y2="220" stroke="#38bdf8" stroke-width="2"/>
+  <rect x="80" y="220" width="280" height="260" rx="10" fill="#1e293b" stroke="#0284c7"/>
+  <text x="220" y="250" fill="#38bdf8" font-size="14" font-weight="700" text-anchor="middle">LOCAL OLLAMA INFERENCE</text>
+  <text x="220" y="270" fill="#94a3b8" font-size="11" text-anchor="middle">100% Offline / Zero API Keys</text>
+
+  <rect x="100" y="290" width="240" height="55" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="220" y="312" fill="#f8fafc" font-size="11" font-weight="600" text-anchor="middle">Liquid AI: lfm3-omni:2b</text>
+  <text x="220" y="330" fill="#94a3b8" font-size="10" text-anchor="middle">1.7B params / 4-bit Q4_K_M (1.61 GB)</text>
+
+  <rect x="100" y="355" width="240" height="55" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="220" y="377" fill="#f8fafc" font-size="11" font-weight="600" text-anchor="middle">Ollama Lifecycle Control</text>
+  <text x="220" y="395" fill="#94a3b8" font-size="10" text-anchor="middle">'Start ollama' / 'Stop ollama' (Saves 2GB)</text>
+
+  <rect x="100" y="420" width="240" height="45" rx="6" fill="#0f172a" stroke="#22c55e"/>
+  <text x="220" y="445" fill="#4ade80" font-size="11" font-weight="600" text-anchor="middle">HTTP 127.0.0.1:11434</text>
+
+  <!-- Right: Cloud Mode -->
+  <line x1="560" y1="170" x2="740" y2="220" stroke="#38bdf8" stroke-width="2"/>
+  <rect x="600" y="220" width="280" height="260" rx="10" fill="#1e293b" stroke="#10b981"/>
+  <text x="740" y="250" fill="#34d399" font-size="14" font-weight="700" text-anchor="middle">CLOUD AI ONBOARDING</text>
+  <text x="740" y="270" fill="#94a3b8" font-size="11" text-anchor="middle">Proactive Fallback when Offline</text>
+
+  <rect x="620" y="290" width="240" height="55" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="740" y="312" fill="#f8fafc" font-size="11" font-weight="600" text-anchor="middle">OpenAI-Compatible Bridge</text>
+  <text x="740" y="330" fill="#94a3b8" font-size="10" text-anchor="middle">OpenAI, OpenRouter, Groq, Anthropic</text>
+
+  <rect x="620" y="355" width="240" height="55" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="740" y="377" fill="#f8fafc" font-size="11" font-weight="600" text-anchor="middle">Masked Key Telemetry</text>
+  <text x="740" y="395" fill="#94a3b8" font-size="10" text-anchor="middle">sk-...1234 / Zero plain secrets</text>
+
+  <rect x="620" y="420" width="240" height="45" rx="6" fill="#0f172a" stroke="#eab308"/>
+  <text x="740" y="445" fill="#facc15" font-size="11" font-weight="600" text-anchor="middle">Proactive Voice Onboarding Loop</text>
+
+  <!-- Center: Offline Detection Banner -->
+  <rect x="380" y="300" width="200" height="120" rx="8" fill="#0f172a" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="480" y="330" fill="#f87171" font-size="12" font-weight="700" text-anchor="middle">OFFLINE DETECTION</text>
+  <text x="480" y="355" fill="#94a3b8" font-size="10" text-anchor="middle">If Ollama daemon unreachable:</text>
+  <text x="480" y="375" fill="#f8fafc" font-size="10" text-anchor="middle">Prompts: 'Local Ollama is offline.</text>
+  <text x="480" y="395" fill="#f8fafc" font-size="10" text-anchor="middle">Connect Cloud AI model &amp; key?'</text>
+</svg>

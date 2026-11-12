@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="100%" height="100%" style="background:#0f172a; font-family:'Inter',system-ui,sans-serif;">
+  <defs>
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+  <!-- Title -->
+  <text x="480" y="38" fill="#f8fafc" font-size="20" font-weight="700" text-anchor="middle" letter-spacing="1">VOID AGENTIC OS — OVERALL SYSTEM ARCHITECTURE</text>
+  <text x="480" y="60" fill="#94a3b8" font-size="12" text-anchor="middle">Dual-Tier Coexistence Architecture: Sub-5ms Direct Fast-Path + Autonomous Multi-Agent Core</text>
+
+  <!-- Tier 1: User & Input Pipeline -->
+  <rect x="40" y="90" width="260" height="410" rx="12" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.5"/>
+  <rect x="40" y="90" width="260" height="36" rx="12" fill="#1e293b"/>
+  <text x="170" y="114" fill="#38bdf8" font-size="14" font-weight="600" text-anchor="middle">I/O & INTERACTION TIER</text>
+  
+  <rect x="60" y="145" width="220" height="60" rx="8" fill="#0f172a" stroke="#0ea5e9" stroke-width="1"/>
+  <text x="170" y="170" fill="#f8fafc" font-size="13" font-weight="600" text-anchor="middle">Voice Engine (Wake + Vosk)</text>
+  <text x="170" y="190" fill="#64748b" font-size="11" text-anchor="middle">'Hey VOID' / Kaldi Real-Time FST</text>
+
+  <rect x="60" y="225" width="220" height="60" rx="8" fill="#0f172a" stroke="#0ea5e9" stroke-width="1"/>
+  <text x="170" y="250" fill="#f8fafc" font-size="13" font-weight="600" text-anchor="middle">Speech Pipeline (Whisper + Piper)</text>
+  <text x="170" y="270" fill="#64748b" font-size="11" text-anchor="middle">Faster-Whisper int8 / Piper TTS</text>
+
+  <rect x="60" y="305" width="220" height="60" rx="8" fill="#0f172a" stroke="#0ea5e9" stroke-width="1"/>
+  <text x="170" y="330" fill="#f8fafc" font-size="13" font-weight="600" text-anchor="middle">Glass Flow Floating UI</text>
+  <text x="170" y="350" fill="#64748b" font-size="11" text-anchor="middle">PySide6 Wayland Acrylic / Constellation Orb</text>
+
+  <rect x="60" y="385" width="220" height="60" rx="8" fill="#0f172a" stroke="#0ea5e9" stroke-width="1"/>
+  <text x="170" y="410" fill="#f8fafc" font-size="13" font-weight="600" text-anchor="middle">Activity & Task Card</text>
+  <text x="170" y="430" fill="#64748b" font-size="11" text-anchor="middle">Live Multi-Agent DAG Visualizer</text>
+
+  <!-- Router Arrow -->
+  <path d="M 300 295 L 340 295" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="4"/>
+
+  <!-- Tier 2: Backward-Compatible Router -->
+  <rect x="350" y="90" width="260" height="410" rx="12" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.5"/>
+  <rect x="350" y="90" width="260" height="36" rx="12" fill="#1e293b"/>
+  <text x="480" y="114" fill="#a855f7" font-size="14" font-weight="600" text-anchor="middle">ROUTER & COEXISTENCE</text>
+
+  <rect x="370" y="145" width="220" height="65" rx="8" fill="#0f172a" stroke="#22c55e" stroke-width="1"/>
+  <text x="480" y="170" fill="#4ade80" font-size="13" font-weight="600" text-anchor="middle">Direct Fast-Path (&lt;5ms)</text>
+  <text x="480" y="190" fill="#94a3b8" font-size="11" text-anchor="middle">Window, Volume, App Launch, Math</text>
+  <text x="480" y="204" fill="#64748b" font-size="10" text-anchor="middle">Zero VRAM / 100% Offline</text>
+
+  <rect x="370" y="230" width="220" height="75" rx="8" fill="#0f172a" stroke="#a855f7" stroke-width="1"/>
+  <text x="480" y="255" fill="#c084fc" font-size="13" font-weight="600" text-anchor="middle">Intent Classifier & Guard</text>
+  <text x="480" y="275" fill="#94a3b8" font-size="11" text-anchor="middle">Multi-Agent Keyword / Complexity</text>
+  <text x="480" y="293" fill="#64748b" font-size="10" text-anchor="middle">Phonetic Typo Tolerance Guard</text>
+
+  <rect x="370" y="325" width="220" height="75" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="1"/>
+  <text x="480" y="350" fill="#38bdf8" font-size="13" font-weight="600" text-anchor="middle">Supervisor Orchestrator</text>
+  <text x="480" y="370" fill="#94a3b8" font-size="11" text-anchor="middle">DAG Generator / Task Delegation</text>
+  <text x="480" y="388" fill="#64748b" font-size="10" text-anchor="middle">Approval Queue & Verification Gate</text>
+
+  <rect x="370" y="420" width="220" height="60" rx="8" fill="#0f172a" stroke="#eab308" stroke-width="1"/>
+  <text x="480" y="445" fill="#facc15" font-size="13" font-weight="600" text-anchor="middle">Safety & Recovery Engine</text>
+  <text x="480" y="465" fill="#64748b" font-size="11" text-anchor="middle">Bounded Retries (Max 2) / Abort Interruption</text>
+
+  <!-- Tier 3: Specialized Multi-Agent Core -->
+  <rect x="660" y="90" width="260" height="410" rx="12" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.5"/>
+  <rect x="660" y="90" width="260" height="36" rx="12" fill="#1e293b"/>
+  <text x="790" y="114" fill="#f43f5e" font-size="14" font-weight="600" text-anchor="middle">AGENTIC SPECIALIZATION</text>
+
+  <rect x="680" y="135" width="220" height="45" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="790" y="155" fill="#f8fafc" font-size="12" font-weight="600" text-anchor="middle">Linux Intelligence Agent</text>
+  <text x="790" y="170" fill="#64748b" font-size="10" text-anchor="middle">Diagnostics, Sockets, Uptime, KWin</text>
+
+  <rect x="680" y="190" width="220" height="45" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="790" y="210" fill="#f8fafc" font-size="12" font-weight="600" text-anchor="middle">Developer Agent</text>
+  <text x="790" y="225" fill="#64748b" font-size="10" text-anchor="middle">TDD Scaffolding, PyTest, Linting</text>
+
+  <rect x="680" y="245" width="220" height="45" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="790" y="265" fill="#f8fafc" font-size="12" font-weight="600" text-anchor="middle">Research &amp; Productivity Agent</text>
+  <text x="790" y="280" fill="#64748b" font-size="10" text-anchor="middle">Live DDG Search, DOCX, XLSX, Notes</text>
+
+  <rect x="680" y="300" width="220" height="45" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="790" y="320" fill="#f8fafc" font-size="12" font-weight="600" text-anchor="middle">Verification Agent</text>
+  <text x="790" y="335" fill="#64748b" font-size="10" text-anchor="middle">Ground-Truth Artifact &amp; Exit-Code Checker</text>
+
+  <rect x="680" y="355" width="220" height="45" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="790" y="375" fill="#f8fafc" font-size="12" font-weight="600" text-anchor="middle">7-Day High Memory Engine</text>
+  <text x="790" y="390" fill="#64748b" font-size="10" text-anchor="middle">168h Rolling Thoughts / Weekly Digest (.md/.json)</text>
+
+  <rect x="680" y="410" width="220" height="45" rx="6" fill="#0f172a" stroke="#334155"/>
+  <text x="790" y="430" fill="#f8fafc" font-size="12" font-weight="600" text-anchor="middle">AI Provider Manager</text>
+  <text x="790" y="445" fill="#64748b" font-size="10" text-anchor="middle">Local Ollama (lfm3-omni:2b) / Cloud API Fallback</text>
+</svg>
