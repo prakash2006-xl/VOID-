@@ -63,7 +63,9 @@ class AuditLogger:
             for k, v in data.items():
                 lower_k = k.lower()
                 if any(sec in lower_k for sec in ("key", "secret", "token", "password", "auth")):
-                    if isinstance(v, str) and len(v) > 8:
+                    if "password" in lower_k:
+                        masked[k] = "******"
+                    elif isinstance(v, str) and len(v) > 8:
                         masked[k] = f"{v[:3]}...{v[-4:]}"
                     else:
                         masked[k] = "******"

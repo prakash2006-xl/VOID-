@@ -87,6 +87,9 @@ class MultiAgentOrchestrator:
         Executes a WorkflowPlan to completion or failure, resolving DAG dependencies.
         """
         self.active_plan = plan
+        if self._is_cancelled:
+            plan.state = WorkflowLifecycleState.CANCELLED
+            return plan
         self._is_cancelled = False
         context: Dict[str, Any] = initial_context or {}
         context["artifacts"] = []

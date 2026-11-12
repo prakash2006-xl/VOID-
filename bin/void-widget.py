@@ -4544,8 +4544,12 @@ class AudioVoiceEngine(QObject):
             st = "muted" if v.get("muted") else f"{v.get('volume_pct')}%"
             return (f"Master audio volume is currently {st}.", "Audio: Status", "")
 
-        # Strict volume setting: requires explicit command verb (prevents accidental matches from numbers/noise)
-        vol_set_m = re.search(r"^\s*(?:please\s+)?(?:set|change|turn|adjust|put)\s+(?:the\s+)?(?:audio\s+|master\s+)?volume\s+(?:to\s+)?(\d+)\s*(?:%|percent)?\s*$", q_lower) or re.search(r"\b(?:set|change|turn|adjust)\s+(?:the\s+)?volume\s+(?:to\s+)?(\d+)%?\b", q_lower)
+        # Strict volume setting: supports 'volume 50%', 'set volume to 50%', etc.
+        vol_set_m = (
+            re.search(r"^\s*(?:please\s+)?(?:set|change|turn|adjust|put\s+)?(?:the\s+)?(?:audio\s+|master\s+)?volume\s+(?:to\s+)?(\d+)\s*(?:%|percent)?\s*$", q_lower)
+            or re.search(r"\b(?:set|change|turn|adjust|put)?\s*(?:the\s+)?volume\s+(?:to\s+)?(\d+)%?\b", q_lower)
+            or re.search(r"^\s*volume\s+(\d+)\s*(?:%|percent)?\s*$", q_lower)
+        )
         if vol_set_m:
             target_vol = int(vol_set_m.group(1))
             msg = self.tool_hub.set_volume(target_vol)
