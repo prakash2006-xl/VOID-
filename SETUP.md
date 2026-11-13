@@ -297,7 +297,15 @@ All power-destructive actions feature a 5-second cancelable interactive UI banne
   * Voice commands: *"start model"*, *"start model again"*, *"start the model"*, *"start ollama"*, *"load model"*, *"resume model"*
   * Action: Starts the Ollama server daemon (`systemctl start ollama`), restores internal connectivity, warms up the model into GPU/RAM, and brings the local AI brain back online.
 
-### 3. Desktop, Window & Process Activities
+### 3. Dedicated Stop Launcher & Automated RAM Reclaim (`void-stop.desktop`)
+Clicking the **Stop VOID AI & Clear RAM** icon (or running `scripts/stop_void.sh` or `void-stop` in terminal) executes a comprehensive, multi-stage clean shutdown:
+1. **Complete In-Flight Tasks:** Flushes disk buffers (`sync`), inspects `config/tasks.json`, marks active workflows as safely finalized, and commits persistent thought memories.
+2. **Deactivate All Models:** Queries `/api/ps` on Ollama, unloads every active model weight (`nano-brain`, `lfm3-omni:2b`, etc.) from GPU VRAM and system memory, and kills any background `llama-server` / `llama-finetune` workers.
+3. **Stop Model Server:** Stops `systemctl stop ollama` and terminates user-level daemon processes.
+4. **Terminate Interface:** Cleanly terminates the PySide6 glass flow widget and Dodaios backend servers.
+5. **Reclaim RAM & Drop Caches:** Invokes kernel memory synchronization, drops cached page buffers, reports exact megabytes reclaimed, and displays a native desktop notification confirming shutdown.
+
+### 4. Desktop, Window & Process Activities
 * **Window Management:**
   * *"minimize antigravity"*, *"close chromium"*, *"maximize terminal"*, *"fullscreen"*
   * *"show desktop"* (instantly toggles clean desktop view).

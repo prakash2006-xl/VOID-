@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Stop VOID AI & Clear RAM
+GenericName=Stop AI & Free Memory
+Comment=Stop VOID, deactivate AI models, complete pending tasks, and clear system RAM
+Exec=/run/media/prakash/TR_39/VOID/scripts/stop_void.sh
+Path=/run/media/prakash/TR_39/VOID
+Icon=process-stop
+Terminal=false
+Categories=Utility;System;
+StartupNotify=true

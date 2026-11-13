@@ -477,23 +477,44 @@ StartupNotify=true
 Actions=Stop;Configure;
 
 [Desktop Action Stop]
-Name=Stop VOID
+Name=Stop VOID & Clear RAM
+Comment=Stop VOID, deactivate neural models, and reclaim RAM
 Exec=${SCRIPT_DIR}/scripts/stop_void.sh
 
 [Desktop Action Configure]
 Name=Configure VOID Models
+Comment=Configure AI models and keys in terminal
 Exec=${SCRIPT_DIR}/terminalsetuprun
 EOF
 
 chmod +x "$DESKTOP_ENTRY"
 
-# Place desktop shortcut if user Desktop folder exists
+# Register dedicated Stop Launcher (deactivates models, completes tasks & clears RAM)
+DESKTOP_STOP_ENTRY="${TARGET_HOME}/.local/share/applications/void-stop.desktop"
+cat <<EOF > "$DESKTOP_STOP_ENTRY"
+[Desktop Entry]
+Type=Application
+Name=Stop VOID AI & Clear RAM
+GenericName=Stop AI & Free Memory
+Comment=Stop VOID, deactivate AI models, complete pending tasks, and clear system RAM
+Exec=${SCRIPT_DIR}/scripts/stop_void.sh
+Path=${SCRIPT_DIR}
+Icon=process-stop
+Terminal=false
+Categories=Utility;System;
+StartupNotify=true
+EOF
+
+chmod +x "$DESKTOP_STOP_ENTRY"
+
+# Place desktop shortcuts if user Desktop folder exists
 if [ -d "${TARGET_HOME}/Desktop" ]; then
     cp -f "$DESKTOP_ENTRY" "${TARGET_HOME}/Desktop/void.desktop"
-    chmod +x "${TARGET_HOME}/Desktop/void.desktop" 2>/dev/null || true
+    cp -f "$DESKTOP_STOP_ENTRY" "${TARGET_HOME}/Desktop/void-stop.desktop"
+    chmod +x "${TARGET_HOME}/Desktop/void.desktop" "${TARGET_HOME}/Desktop/void-stop.desktop" 2>/dev/null || true
 fi
 
-# CLI symlink (~/.local/bin/void)
+# CLI symlink (~/.local/bin/void & ~/.local/bin/void-stop)
 ln -sf "${SCRIPT_DIR}/scripts/run_void.sh" "${TARGET_HOME}/.local/bin/void"
 ln -sf "${SCRIPT_DIR}/scripts/stop_void.sh" "${TARGET_HOME}/.local/bin/void-stop"
 
@@ -506,7 +527,9 @@ if has_cmd update-desktop-database; then
 fi
 
 echo -e "${GREEN}  ✓ Desktop launcher registered (~/.local/share/applications/void.desktop).${NC}"
+echo -e "${GREEN}  ✓ Desktop stop launcher registered (~/.local/share/applications/void-stop.desktop).${NC}"
 echo -e "${GREEN}  ✓ CLI shortcut linked: void -> ${SCRIPT_DIR}/scripts/run_void.sh${NC}"
+echo -e "${GREEN}  ✓ CLI stop shortcut linked: void-stop -> ${SCRIPT_DIR}/scripts/stop_void.sh${NC}"
 
 # ==============================================================================
 # Execution / Verification Summary

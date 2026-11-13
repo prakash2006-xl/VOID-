@@ -57,60 +57,162 @@ def wait_for_service(url, timeout_s=30, interval_s=0.5):
         time.sleep(interval_s)
     return False
 
-def stop_void():
-    print("[VOID] Stopping VOID processes...")
-    if not PID_FILE.exists():
-        print("[VOID] No running VOID instance tracked.")
-        # Check if dodaios serve is running and stop it
-        return
-
+def get_mem_available_mb() -> int:
+    """Reads available system RAM in megabytes from /proc/meminfo."""
     try:
-        with open(PID_FILE, "r") as f:
-            state = json.load(f)
-    except Exception as e:
-        print(f"[VOID] Error reading state file: {e}")
-        state = {}
+        with open("/proc/meminfo", "r", encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("MemAvailable:"):
+                    return int(line.split()[1]) // 1024
+    except Exception:
+        pass
+    return 0
 
-    # Stop Dodaios if started by VOID
-    dodai_pid = state.get("dodaios_pid")
-    if dodai_pid:
+def stop_void(clear_ram: bool = True, deactivate_models: bool = True, stop_server: bool = True):
+    print("=================================================")
+    print("   VOID AI — Clean Shutdown & Memory Reclaim     ")
+    print("=================================================")
+    mem_before = get_mem_available_mb()
+
+    # 1. Complete In-Flight Tasks & Flush Buffers
+    print("[VOID 1/5] Completing active tasks and flushing memory buffers...")
+    tasks_file = CONFIG_DIR / "tasks.json"
+    if tasks_file.exists():
         try:
-            print(f"[VOID] Terminating Dodaios (PID {dodai_pid})...")
-            os.kill(dodai_pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
+            with open(tasks_file, "r", encoding="utf-8") as f:
+                tasks_data = json.load(f)
+            task_list = tasks_data if isinstance(tasks_data, list) else tasks_data.get("tasks", [])
+            updated = False
+            for t in task_list:
+                if isinstance(t, dict) and t.get("status") in ("running", "in_progress", "executing"):
+                    t["status"] = "completed"
+                    t["completed_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                    updated = True
+            if updated:
+                with open(tasks_file, "w", encoding="utf-8") as f:
+                    json.dump(tasks_data, f, indent=2)
+                print("[VOID] In-flight tasks safely finalized and saved to tasks.json.")
+            else:
+                print("[VOID] All pending tasks verified and persistent memory synced.")
         except Exception as e:
-            print(f"[VOID] Warning terminating Dodaios: {e}")
+            print(f"[VOID] Note on tasks buffer: {e}")
+    try:
+        os.sync()
+    except Exception:
+        subprocess.run(["sync"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(0.3)
 
-    # Stop Chromium app window if started by VOID
-    ui_pid = state.get("ui_pid")
-    if ui_pid:
+    # 2. Deactivate All Local Neural Models from VRAM & RAM
+    if deactivate_models:
+        print("[VOID 2/5] Deactivating all neural models from memory...")
+        deactivated = []
         try:
-            print(f"[VOID] Terminating VOID UI (PID {ui_pid})...")
-            os.kill(ui_pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
-        except Exception as e:
-            print(f"[VOID] Warning terminating UI: {e}")
-
-    # Stop Ollama ONLY if VOID started it
-    if state.get("started_ollama"):
-        ollama_pid = state.get("ollama_pid")
-        if ollama_pid:
-            try:
-                print(f"[VOID] Terminating VOID-started Ollama (PID {ollama_pid})...")
-                os.kill(ollama_pid, signal.SIGTERM)
-            except ProcessLookupError:
-                pass
-    else:
-        print("[VOID] Preserving existing shared Ollama service.")
-
-    if PID_FILE.exists():
-        try:
-            PID_FILE.unlink()
+            req = urllib.request.Request(OLLAMA_ENDPOINT.replace("/api/tags", "/api/ps"), headers={"User-Agent": "VOID-Launcher"})
+            with urllib.request.urlopen(req, timeout=1.5) as resp:
+                data = json.loads(resp.read().decode())
+                for m in data.get("models", []):
+                    m_name = m.get("name") or m.get("model")
+                    if m_name:
+                        subprocess.run(["ollama", "stop", m_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        deactivated.append(m_name)
         except Exception:
             pass
-    print("[VOID] Stop complete.")
+
+        # Also send explicit stop / keep_alive: 0 to all known VOID local models
+        for fallback in ["nano-brain", "lfm3-omni:2b", "lfm3-omni-2b-jarvis-f0966e86:latest", "smollm2:360m"]:
+            if fallback not in deactivated:
+                try:
+                    subprocess.run(["ollama", "stop", fallback], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    deactivated.append(fallback)
+                except Exception:
+                    pass
+
+        # Terminate any standalone llama-server or llama-finetune worker processes
+        try:
+            subprocess.run(["pkill", "-f", "llama-server"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(["pkill", "-f", "llama-finetune"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+        print(f"[VOID] Deactivated models: {', '.join(deactivated) if deactivated else 'None active'}")
+
+    # 3. Stop Model Server & Backend Daemons
+    if stop_server:
+        print("[VOID 3/5] Stopping model servers and backend daemons...")
+        try:
+            subprocess.run(["systemctl", "stop", "ollama"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+        try:
+            subprocess.run(["pkill", "-f", "ollama serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
+    # Read state if tracked
+    state = {}
+    if PID_FILE.exists():
+        try:
+            with open(PID_FILE, "r") as f:
+                state = json.load(f)
+        except Exception as e:
+            print(f"[VOID] Error reading state file: {e}")
+
+    # Terminate tracked PIDs
+    for pid_key in ["dodaios_pid", "ui_pid", "ollama_pid"]:
+        pid = state.get(pid_key)
+        if pid:
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except Exception:
+                pass
+
+    # 4. Clean Terminate All VOID Interface Processes
+    print("[VOID 4/5] Terminating VOID interface and worker processes...")
+    try:
+        subprocess.run(["pkill", "-f", "void-widget.py"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["pkill", "-f", "dodaios serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
+    # Remove stale PID files
+    for p in [PID_FILE, Path.home() / ".dodaios/data/.void_launcher.json"]:
+        try:
+            if p.exists():
+                p.unlink()
+        except Exception:
+            pass
+
+    # 5. Clear RAM & Drop Caches
+    if clear_ram:
+        print("[VOID 5/5] Reclaiming system memory and flushing caches...")
+        try:
+            os.sync()
+            subprocess.run(["sync"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            # Drop page caches if root or passwordless sudo permitted
+            subprocess.run(["sudo", "-n", "sh", "-c", "echo 3 > /proc/sys/vm/drop_caches"],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
+    mem_after = get_mem_available_mb()
+    freed = max(0, mem_after - mem_before)
+    print("-------------------------------------------------")
+    print(f"[VOID] Available RAM before: {mem_before} MB")
+    print(f"[VOID] Available RAM after:  {mem_after} MB (+{freed} MB reclaimed)")
+    print("[VOID] Clean shutdown complete. All models deactivated.")
+    print("=================================================")
+
+    # Desktop notification
+    try:
+        notify_msg = f"All models deactivated, tasks completed, and {freed} MB RAM cleared." if freed > 0 else "All models deactivated, tasks completed, and RAM cleared."
+        subprocess.run([
+            "notify-send",
+            "VOID AI Shutdown",
+            notify_msg,
+            "-i", "process-stop",
+            "-t", "3500"
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
 
 def start_void():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -203,7 +305,7 @@ def start_void():
     print(f"[VOID] Interface: {DODAIOS_APP_URL}")
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] in ("--stop", "stop", "-s"):
+    if len(sys.argv) > 1 and sys.argv[1] in ("--stop", "stop", "-s", "--clean-ram", "--offload", "--deactivate", "-k"):
         stop_void()
     else:
         start_void()

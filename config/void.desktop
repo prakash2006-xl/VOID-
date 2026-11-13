@@ -1,13 +1,22 @@
 [Desktop Entry]
 Type=Application
-Name=VOID Desktop Assistant
-Comment=VOID Autonomous Personal AI Desktop Assistant
-Exec=/home/prakash/.local/bin/void-launcher.py
-Path=/home/prakash
+Name=VOID AI Assistant
+GenericName=AI Desktop Assistant
+Comment=Launch VOID Autonomous AI Desktop Assistant
+Exec=/run/media/prakash/TR_39/VOID/scripts/run_void.sh
+Path=/run/media/prakash/TR_39/VOID
+Icon=system-run
 Terminal=false
-Icon=applications-system
 Categories=Utility;System;AudioVideo;
-X-GNOME-Autostart-enabled=true
-X-KDE-autostart-phase=2
-StartupNotify=false
+StartupNotify=true
+Actions=Stop;Configure;
 
+[Desktop Action Stop]
+Name=Stop VOID & Clear RAM
+Comment=Stop VOID, deactivate neural models, and reclaim RAM
+Exec=/run/media/prakash/TR_39/VOID/scripts/stop_void.sh
+
+[Desktop Action Configure]
+Name=Configure VOID Models
+Comment=Configure AI models and keys in terminal
+Exec=/run/media/prakash/TR_39/VOID/terminalsetuprun
