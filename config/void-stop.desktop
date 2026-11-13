@@ -9,3 +9,4 @@ Icon=process-stop
 Terminal=false
 Categories=Utility;System;
 StartupNotify=true
+
