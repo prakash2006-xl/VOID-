@@ -423,14 +423,25 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "browser_open",
-            "description": "Open Chromium browser with a specific URL, new tab, or search query on screen.",
+            "description": "Open Chromium browser with a specific URL, new tab, or new window on screen. ONLY invoke when user explicitly requests to open browser, new tab, or new window. Never invoke for general background searches.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "url": {"type": "string", "description": "URL to open (e.g. https://google.com or chrome://newtab)"},
-                    "new_tab": {"type": "boolean", "description": "Whether to open in a new tab"},
+                    "new_tab": {"type": "boolean", "description": "Whether to open in a new tab (true) or new window (false)"},
                     "search_query": {"type": "string", "description": "Optional search query to run in Chromium"}
                 }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "browser_close_tab",
+            "description": "Close or delete the currently active tab in the running Chromium browser.",
+            "parameters": {
+                "type": "object",
+                "properties": {}
             }
         }
     },
@@ -681,14 +692,29 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "search_files",
-            "description": "Search for files by filename pattern in the user's home directories.",
+            "description": "Search for files by filename pattern in user directories (case-insensitive search).",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "pattern": {"type": "string", "description": "Filename pattern to match (e.g. *.txt, *report*, *.pdf)"},
-                    "search_path": {"type": "string", "description": "Directory to search within (default ~/Documents)"}
+                    "pattern": {"type": "string", "description": "Filename pattern to match (e.g. *.txt, *report*, *.zip, *.pdf)"},
+                    "search_path": {"type": "string", "description": "Optional directory to search within (e.g. ~/Documents or /run/media/prakash/TR_39)"}
                 },
                 "required": ["pattern"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_file",
+            "description": "Request deletion of a file. Strictly requires exact case filename. Automatically triggers safety confirmation before permanently deleting.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "filename": {"type": "string", "description": "Exact case filename to delete (e.g. VOID.zip or report.pdf)"},
+                    "directory": {"type": "string", "description": "Optional search directory (e.g. /run/media/prakash/TR_39)"}
+                },
+                "required": ["filename"]
             }
         }
     },
@@ -1038,13 +1064,19 @@ def kwin_manage_app_window(app_name: str, action: str) -> bool:
 def is_safe_user_path(p: str | Path) -> bool:
     try:
         resolved = Path(p).expanduser().resolve()
-        home = Path.home().resolve()
-        if not resolved.is_relative_to(home):
-            return False
         for forbidden in FORBIDDEN_PATHS:
-            if str(resolved).startswith(forbidden) or resolved == Path(forbidden):
+            if str(resolved) == forbidden or str(resolved).startswith(f"{forbidden}/"):
                 return False
-        return True
+        home = Path.home().resolve()
+        if (
+            resolved.is_relative_to(home)
+            or str(resolved).startswith("/run/media/")
+            or str(resolved).startswith("/media/")
+            or str(resolved).startswith("/mnt/")
+            or str(resolved).startswith("/tmp")
+        ):
+            return True
+        return False
     except Exception:
         return False
 
@@ -1858,6 +1890,13 @@ def normalize_voice_intent(text: str) -> str:
         (r"\b(?:vedio|vido|vdeo|vedeo)\b", "video"),
         (r"\b(?:fotot|foto|photot|pictr|piture|piktur)\b", "photo"),
         (r"\b(?:filname|fiel|fle)\b", "file"),
+        (r"\b(?:deleter|delte|dlete|delet|deler)\b", "delete"),
+        (r"\b(?:tr[- ]?39|tr[- ]?thirty[- ]?nine|tr thirty nine)\b", "TR_39"),
+        (r"\b(?:hey\s+white|hay\s+white)\b", "hey void"),
+        (r"\b(?:white\.zip|whit\.zip)\b", "VOID.zip"),
+        (r"\b(?:close\s+the\s+tab|delete\s+the\s+tab|close\s+a\s+tab|close\s+this\s+tab|close\s+tab|delete\s+tab|close\s+current\s+tab|delete\s+current\s+tab)\b", "close current tab"),
+        (r"\b(?:open\s+(?:a\s+)?new\s+tab|new\s+tab|open\s+tab)\b", "open new tab"),
+        (r"\b(?:open\s+(?:a\s+)?new\s+(?:chromium\s+|browser\s+)?window|new\s+window)\b", "open new window"),
         (r"\b(?:documnt|docment|dcoument)\b", "document"),
         (r"\b(?:can\s+cel)\b", "cancel"),
         (r"\b(?:cerate|creat)\b", "create"),
@@ -3262,7 +3301,8 @@ class DodaiosToolHub:
             (Path.home() / "Downloads"),
             (Path.home() / "Pictures"),
             (Path.home() / "Desktop"),
-            Path("/run/media/prakash/TR_39/VOID"),
+            SSD_VOID_DIR,
+            Path("/run/media/prakash/TR_39"),
         ]
         if search_path:
             custom_p = Path(search_path).expanduser().resolve()
@@ -3303,6 +3343,54 @@ class DodaiosToolHub:
         res = [m[1] for m in matches]
         self.last_search_results = res
         return res
+
+    def find_target_file_for_deletion(self, target_filename: str, search_path: str = "") -> tuple[Path | None, list[Path]]:
+        """Locates candidate files for deletion.
+        Enforces strict case-sensitive matching for the exact target file.
+        Also returns case-insensitive candidates if exact case is missing.
+        """
+        clean_name = target_filename.strip().strip("'\"")
+        search_dirs = [
+            (Path.home() / "Documents"),
+            (Path.home() / "Downloads"),
+            (Path.home() / "Desktop"),
+            (Path.home() / "Pictures"),
+            SSD_VOID_DIR,
+            Path("/run/media/prakash/TR_39"),
+        ]
+        if search_path:
+            p_custom = Path(search_path).expanduser().resolve()
+            if is_safe_user_path(p_custom) and p_custom.exists():
+                search_dirs.insert(0, p_custom)
+
+        exact_matches: list[Path] = []
+        case_insensitive_matches: list[Path] = []
+        seen = set()
+
+        for sdir in search_dirs:
+            if not sdir.exists():
+                continue
+            try:
+                for root, dirs, files in os.walk(sdir):
+                    dirs[:] = [d for d in dirs if not d.startswith(".")]
+                    for fname in files:
+                        full_p = Path(root) / fname
+                        if str(full_p) in seen:
+                            continue
+                        # Strictly case-sensitive match
+                        if fname == clean_name:
+                            exact_matches.append(full_p)
+                            seen.add(str(full_p))
+                        # Case-insensitive match candidate
+                        elif fname.lower() == clean_name.lower():
+                            case_insensitive_matches.append(full_p)
+                            seen.add(str(full_p))
+            except Exception:
+                pass
+
+        if exact_matches:
+            return exact_matches[0], exact_matches
+        return None, case_insensitive_matches
     def create_document(self, path_str: str, content: str) -> str:
         p = Path(path_str).expanduser().resolve()
         if not is_safe_user_path(p):
@@ -3399,6 +3487,40 @@ class DodaiosToolHub:
 
         subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
         return msg
+
+    def open_chromium_tab(self, url: str = "chrome://newtab") -> str:
+        """Opens a new tab in the existing Chromium window (or launches Chromium)."""
+        target_url = url if (url.startswith("http") or url.startswith("chrome://")) else f"https://{url}"
+        subprocess.Popen([CHROMIUM_BIN, target_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        return f"Opened a new tab in Chromium at {target_url}."
+
+    def open_chromium_window(self, url: str = "chrome://newtab") -> str:
+        """Opens a brand new Chromium window."""
+        target_url = url if (url.startswith("http") or url.startswith("chrome://")) else f"https://{url}"
+        subprocess.Popen([CHROMIUM_BIN, "--new-window", target_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        return f"Opened a new Chromium window at {target_url}."
+
+    def close_chromium_tab(self) -> tuple[bool, str]:
+        """Closes the current active tab in existing Chromium window via Ctrl+w."""
+        kwin_manage_app_window("chromium", "activate")
+        time.sleep(0.15)
+        # Attempt xdotool tab close
+        try:
+            res = subprocess.run(
+                ["xdotool", "search", "--onlyvisible", "--class", "chromium", "windowactivate", "--sync", "key", "--clearmodifiers", "ctrl+w"],
+                capture_output=True, text=True, timeout=1.5
+            )
+            if res.returncode == 0:
+                return True, "Closed current tab in Chromium."
+        except Exception:
+            pass
+        # Fallback to pyautogui hotkey
+        try:
+            import pyautogui
+            pyautogui.hotkey('ctrl', 'w')
+            return True, "Closed current tab in Chromium."
+        except Exception as e:
+            return False, f"Could not close Chromium tab: {e}"
 
     def browser_search(self, query: str, engine: str = "google") -> str:
         """Performs a web search directly inside Chromium on screen."""
@@ -5114,11 +5236,26 @@ class AudioVoiceEngine(QObject):
                 return f"Timer started for {dur_str}."
             elif name == "search_files":
                 pat = args.get("pattern", "*")
-                p = args.get("search_path", str(Path.home() / "Documents"))
+                p = args.get("search_path", "")
                 matches = self.tool_hub.search_files(pat, p)
                 if matches:
                     return f"Found {len(matches)} files:\n" + "\n".join(matches[:10])
-                return f"No files found matching '{pat}' in {p}."
+                return f"No files found matching '{pat}'."
+            elif name == "delete_file":
+                fn = args.get("filename", "")
+                d = args.get("directory", "")
+                exact_p, candidates = self.tool_hub.find_target_file_for_deletion(fn, d)
+                if exact_p:
+                    self._pending_action = {"type": "confirm_delete", "path": str(exact_p), "filename": exact_p.name}
+                    return f"PROMPT_USER: Found file '{exact_p.name}' at {exact_p}. Deletion requires your explicit confirmation. Say 'confirm delete' or 'yes delete' to permanently delete this file, or 'cancel' to keep it."
+                elif candidates:
+                    cand = candidates[0]
+                    self._pending_action = {"type": "confirm_delete", "path": str(cand), "filename": cand.name}
+                    return f"PROMPT_USER: Found file '{cand.name}' (note exact case: '{cand.name}' vs requested '{fn}'). File deletion is strictly case-sensitive. Say 'confirm delete' to permanently delete '{cand.name}', or 'cancel' to keep it."
+                return f"No file matching '{fn}' was found in your directories."
+            elif name == "browser_close_tab":
+                ok, msg = self.tool_hub.close_chromium_tab()
+                return msg
             elif name == "create_document":
                 p = args.get("path", "")
                 c = args.get("content", "")
@@ -5370,7 +5507,7 @@ class AudioVoiceEngine(QObject):
                 return
 
             q_clean = q_raw
-            for prefix in ["hey void", "void", "hi void", "hello void", "okay void", "hey boy", "hey boyd", "boyd", "avoid"]:
+            for prefix in ["hey void", "void", "hi void", "hello void", "okay void", "hey white", "white", "hay white", "hey wait", "hey boy", "hey boyd", "boyd", "avoid"]:
                 if q_clean.lower().startswith(prefix):
                     q_clean = q_clean[len(prefix):].strip().lstrip(" ,.:;!?")
                     break
@@ -5581,12 +5718,32 @@ class AudioVoiceEngine(QObject):
                 or any(p in q_lower for p in ["open ", "close ", "draft ", "create ", "search ", "what is", "take screenshot", "start ollama", "hey void"])
             )
             is_cloud_input = (p_action.get("type") == "cloud_setup" and any(k in q_lower for k in ["sk-", "key", "model", "gpt", "claude", "gemini", "llama", "deepseek", "api", "open", "cloud"]))
-            if is_new_cmd and "@" not in q_clean and not is_cloud_input:
+            is_confirm_delete = (p_action.get("type") == "confirm_delete")
+            if is_new_cmd and "@" not in q_clean and not is_cloud_input and not is_confirm_delete:
                 print(f"[VOID Action] Discarding stale pending action ({p_action.get('type')}) because new command intent was initiated: '{q_clean}'", flush=True)
                 self._pending_action = None
             else:
                 p_type = p_action.get("type")
-                if p_type == "cloud_setup":
+                if p_type == "confirm_delete":
+                    target_p = Path(p_action.get("path", ""))
+                    fname = p_action.get("filename", target_p.name if target_p else "file")
+                    if any(w in q_lower for w in ["confirm", "yes", "proceed", "delete", "sure", "do it", "ok", "okay"]):
+                        self._pending_action = None
+                        if target_p and target_p.exists() and is_safe_user_path(target_p):
+                            try:
+                                target_p.unlink()
+                                return (f"File '{fname}' has been permanently deleted from {target_p.parent}.", "File: Deleted", "")
+                            except Exception as e:
+                                return (f"Failed to delete file '{fname}': {e}", "File Delete Error", "")
+                        else:
+                            return (f"File '{fname}' could not be deleted or is protected.", "File Delete Restricted", "")
+                    elif any(w in q_lower for w in ["cancel", "no", "don't", "keep", "stop", "abort", "preserve"]):
+                        self._pending_action = None
+                        return (f"Deletion cancelled. '{fname}' was preserved.", "File: Preserved", "")
+                    else:
+                        return (f"Deletion for '{fname}' is awaiting your confirmation. Say 'confirm delete' to permanently delete it, or 'cancel' to keep it.", "Prompt: Confirm Delete", "")
+
+                elif p_type == "cloud_setup":
                     model, key, base = parse_cloud_credentials(q_clean)
                     if not key:
                         toks = q_clean.strip().split()
@@ -5950,8 +6107,30 @@ class AudioVoiceEngine(QObject):
             kwin_shortcut("Show Desktop")
             return ("Showing desktop.", "KWin: Show Desktop", "")
 
-        # 1c. Browser Tabs & Navigation Fast Path
-        if re.search(r"\b(?:open\s+(?:a\s+)?new\s+tab|open\s+(?:a\s+)?tab|new\s+tab)\b", q_lower):
+        # 1c1. Close / Delete Tab in Existing Chromium Window
+        is_close_tab_cmd = bool(
+            re.search(r"\b(?:close|delete|remove)\s+(?:the\s+|a\s+|this\s+|current\s+)?tab(?:s)?(?:\s+in\s+chromium|\s+in\s+browser)?\b", q_lower) or
+            q_lower.strip() in ["close tab", "delete tab", "close current tab", "delete current tab", "close this tab", "delete this tab", "close tab in chromium"]
+        )
+        if is_close_tab_cmd:
+            ok, msg = self.tool_hub.close_chromium_tab()
+            return (msg, "Chromium: Close Tab", "")
+
+        # 1c2. Open in a NEW Chromium Window
+        is_new_window_cmd = bool(
+            re.search(r"\b(?:open\s+(?:a\s+)?new\s+(?:chromium\s+|browser\s+)?window|new\s+(?:chromium\s+|browser\s+)?window|open\s+(?:a\s+)?window\s+in\s+(?:chromium|browser)|open\s+in\s+new\s+window)\b", q_lower)
+        )
+        if is_new_window_cmd:
+            m_url = re.search(r"(?:for|to|with)\s+(https?://\S+|\S+\.\S+)", q_clean, re.I)
+            url_to_open = m_url.group(1).strip() if m_url else "chrome://newtab"
+            msg = self.tool_hub.open_chromium_window(url_to_open)
+            return (msg, "Chromium: New Window", "")
+
+        # 1c3. Open New Tab in Existing Chromium Window
+        is_new_tab_cmd = bool(
+            re.search(r"\b(?:open\s+(?:a\s+)?new\s+tab|open\s+(?:a\s+)?tab|new\s+tab|open\s+tab\s+in\s+chromium)\b", q_lower)
+        )
+        if is_new_tab_cmd:
             search_part = re.search(r"(?:search(?:\s+for)?|google(?:\s+for)?)\s*(.*)", q_lower)
             if search_part and search_part.group(1).strip():
                 term = search_part.group(1).strip().lstrip(": ")
@@ -5962,21 +6141,18 @@ class AudioVoiceEngine(QObject):
                     return ("What would you like me to search for in Chromium?", "Prompt: Search Query", "")
                 msg = self.tool_hub.browser_search(term)
                 return (msg, f"Browser: Search '{term}'", "")
-            elif "search" in q_lower:
-                self._pending_action = {"type": "browser_search", "awaiting": "query"}
-                return ("What would you like me to search for in Chromium?", "Prompt: Search Query", "")
             else:
-                msg = self.tool_hub.open_browser(url="chrome://newtab", new_tab=True)
-                return (msg, "Browser: New Tab", "")
+                m_url = re.search(r"(?:for|to|with)\s+(https?://\S+|\S+\.\S+)", q_clean, re.I)
+                url_to_open = m_url.group(1).strip() if m_url else "chrome://newtab"
+                msg = self.tool_hub.open_chromium_tab(url_to_open)
+                return (msg, "Chromium: New Tab", "")
 
-        # 1d. Smart Browser Web Search & Navigation
+        # 1d. Explicit Browser Web Search (Only when explicitly asked to search inside browser)
         b_search = (
             re.search(r"(?:open\s+(?:chromium|browser)\s+and\s+search(?:\s+for|\s+this\s+in\s+chromium)?\s*)(.*)", q_lower) or
             re.search(r"(?:open\s+(?:a\s+)?tab(?:\s+in\s+chromium)?\s+and\s+search(?:\s+for)?\s*)(.*)", q_lower) or
             re.search(r"search\s+(.*)\s+in\s+(?:chromium|browser)", q_lower) or
-            re.search(r"(?:open|go\s+to)\s+(?:google|duckduckgo)\s+(?:and\s+search(?:\s+for)?\s*)(.*)", q_lower) or
-            re.search(r"search\s+(?:for\s+)?(.*)\s+on\s+(?:google|chromium|browser)", q_lower) or
-            re.search(r"^google\s+(?:for\s+)?(.*)$", q_lower)
+            re.search(r"search\s+(?:for\s+)?(.*)\s+on\s+(?:google|chromium|browser)\s+in\s+browser", q_lower)
         )
         if b_search:
             term = b_search.group(1).strip().lstrip(": ")
@@ -6482,16 +6658,17 @@ if __name__ == "__main__":
                 msg = self.tool_hub.open_browser(url=svc_url, new_tab=True)
                 return (f"Opened {svc_disp} in Chromium.", f"Browser: {svc_disp}", "")
 
-        if q_lower.startswith("open http") or q_lower.startswith("go to http") or any(ext in q_lower for ext in [".com", ".org", ".io", ".net", ".edu", ".dev"]):
-            url_target = q_clean
-            for pfx in ["open", "go to", "navigate to"]:
-                if url_target.lower().startswith(pfx):
-                    url_target = url_target[len(pfx):].strip()
-            if " " not in url_target and "." in url_target:
-                if not url_target.startswith("http"):
-                    url_target = f"https://{url_target}"
-                msg = self.tool_hub.open_browser(url=url_target, new_tab=True)
-                return (msg, f"Browser: {url_target}", "")
+        is_direct_url_visit = bool(
+            re.match(r"^(?:please\s+)?(?:open|go\s+to|navigate\s+to|visit)\s+(https?://\S+|[a-zA-Z0-9\-]+\.(?:com|org|io|net|edu|dev|ai|in)(?:/\S*)?)$", q_clean.strip(), re.I) or
+            re.match(r"^https?://\S+$", q_clean.strip(), re.I)
+        )
+        if is_direct_url_visit:
+            m_target = re.match(r"^(?:please\s+)?(?:open|go\s+to|navigate\s+to|visit)\s+(.+)$", q_clean.strip(), re.I)
+            url_target = m_target.group(1).strip() if m_target else q_clean.strip()
+            if not url_target.startswith("http"):
+                url_target = f"https://{url_target}"
+            msg = self.tool_hub.open_chromium_tab(url=url_target)
+            return (f"Opened {url_target} in Chromium.", f"Browser: {url_target[:18]}", "")
 
         # 1e. Live Voice Dictation / Voice Typing Start Fast-Path
         if any(p in q_lower for p in ["start dictation", "dictation mode", "start voice typing", "voice typing", "type what i say", "dictate to note", "dictate"]):
@@ -6638,7 +6815,41 @@ if __name__ == "__main__":
                 res = self.tool_hub.read_note(title)
                 return (res, f"Note: {title[:16]}", "")
 
-                # 1h. File Search & Interactive Number Selection Fast-Path
+        # 1g2. Safe Case-Sensitive File Deletion Fast-Path with User Confirmation Gate
+        del_file_m = (
+            re.search(r"^(?:please\s+)?(?:delete|remove|deleter|erase|trash)\s+(?:the\s+)?(?:zip\s+|pdf\s+|doc\s+|docx\s+|code\s+|text\s+)?files?\s+(?:named|called)?\s*[\"']?([a-zA-Z0-9_\-\.\s\(\)]+?)[\"']?(?:\s+in\s+([a-zA-Z0-9_\-\.\s/]+?)(?:\s+folder|\s+directory)?)?$", q_clean, re.I) or
+            re.search(r"^(?:please\s+)?(?:delete|remove|deleter|erase|trash)\s+[\"']?([a-zA-Z0-9_\-\.]+\.[a-zA-Z0-9]+)[\"']?(?:\s+in\s+([a-zA-Z0-9_\-\.\s/]+?)(?:\s+folder|\s+directory)?)?$", q_clean, re.I)
+        )
+        if del_file_m:
+            target_fn = del_file_m.group(1).strip().strip("'\"")
+            target_dir = del_file_m.group(2).strip() if (del_file_m.lastindex and del_file_m.lastindex >= 2 and del_file_m.group(2)) else ""
+            if target_dir:
+                if any(k in target_dir.lower() for k in ["tr39", "tr 39", "tr_39"]):
+                    target_dir = "/run/media/prakash/TR_39"
+                elif "download" in target_dir.lower():
+                    target_dir = str(Path.home() / "Downloads")
+                elif "document" in target_dir.lower():
+                    target_dir = str(Path.home() / "Documents")
+                elif "desktop" in target_dir.lower():
+                    target_dir = str(Path.home() / "Desktop")
+
+            exact_f, cand_files = self.tool_hub.find_target_file_for_deletion(target_fn, target_dir)
+            if exact_f:
+                self._pending_action = {"type": "confirm_delete", "path": str(exact_f), "filename": exact_f.name}
+                ui_msg = f"Found target file: <b>{exact_f.name}</b> in <code>{exact_f.parent}</code>.<br><br><b>⚠️ Confirmation Required:</b> File deletion is permanent. Say <i>'confirm delete'</i> or <i>'yes delete'</i> to permanently delete, or <i>'cancel'</i> to keep it."
+                spk_msg = f"Found file {exact_f.name}. Deletion requires your explicit confirmation. Say confirm delete or cancel."
+                return (ui_msg, f"Confirm Delete: {exact_f.name[:16]}", "")
+            elif cand_files:
+                cand = cand_files[0]
+                self._pending_action = {"type": "confirm_delete", "path": str(cand), "filename": cand.name}
+                ui_msg = f"Found match with different casing: <b>{cand.name}</b> in <code>{cand.parent}</code> (note exact case: <i>{cand.name}</i> vs requested <i>{target_fn}</i>).<br><br><b>⚠️ Confirmation Required:</b> File deletion is strictly case-sensitive. Say <i>'confirm delete'</i> to permanently delete <b>{cand.name}</b>, or <i>'cancel'</i> to preserve it."
+                spk_msg = f"Found file {cand.name}. File deletion is strictly case-sensitive. Say confirm delete to permanently delete it, or cancel."
+                return (ui_msg, f"Confirm Delete: {cand.name[:16]}", "")
+            else:
+                dir_note = f" in {target_dir}" if target_dir else ""
+                return (f"No file matching '{target_fn}' was found{dir_note}.", "File: Not Found", "")
+
+        # 1h. File Search & Interactive Number Selection Fast-Path
         file_search_m = re.match(r"^(?:please\s+)?(?:search(?:\s+for)?|find|locate)\s+(?:all\s+)?files?\s+(?:named|matching|with|for)?\s*(.+)$", q_clean, re.I)
         if file_search_m and not any(k in q_lower for k in ["search notes", "search note", "notes for", "in notes"]):
             pat = file_search_m.group(1).strip().strip("'\"")
@@ -7166,12 +7377,13 @@ if __name__ == "__main__":
                         "STRICT BEHAVIOR RULES:\n0. CRITICAL: EXECUTE ONLY THE USER'S CURRENT REQUEST. DO NOT re-execute, repeat, or resurrect tasks, tool calls, or actions from previous turns. Treat each user message as a distinct goal.\n"
                         "1. NEVER introduce yourself unless the user explicitly asks 'who are you'. NEVER begin responses with 'I am VOID' or 'As an AI assistant'.\n"
                         "2. AUTONOMOUS TASK PLANNING & EXECUTION: You possess full capability to plan and execute multi-step complex tasks. When the user gives a complex goal, formulate a clear sequential plan, decompose it into sub-goals, and invoke necessary tools (e.g. web search, file management, email drafting, safe commands, task reminders) step by step until the goal is fully achieved.\n"
-                        "3. BROWSER & EMAIL EXECUTION: When asked to open mail, compose an email, or send an email in the browser, invoke 'browser_compose_email' with the recipient, subject, and body so that Chromium opens with Gmail compose loaded on screen. If the recipient email is missing from the request, invoke 'ask_user_clarification' or ask the user directly for the recipient's email address. When asked to open a new tab, search, or visit a website on screen, call 'browser_open' or 'browser_search'. Maintain local project files using 'create_document', 'append_document', 'read_document', and 'list_files'. NEVER simply save an email draft to disk when the user asked to send or compose it in the browser!\n"
+                        "3. BROWSER & TAB EXECUTION: NEVER automatically open Chromium tabs or windows for general questions, summaries, or web research. Only call 'browser_open' when the user explicitly requests to open a website on screen, open a new tab, or open a browser window. To close an active tab, invoke 'browser_close_tab'. For general web knowledge, use 'search_web' (headless) and answer in text/voice without launching the browser GUI.\n"
                         "4. TRUTHFUL BOUNDARIES: If a user asks for something outside system boundaries or impossible with available tools (e.g. modifying root system files, accessing unauthorized remote accounts), state clearly: 'I am unable to complete this task because [exact reason]'. NEVER claim an action was done if no tool was executed.\n"
                         "5. APP OPENING & CLOSING: Always launch desktop applications natively using system desktop entries (e.g. Antigravity IDE, Konsole, Dolphin, Kate, KCalc). If the user asks to open an application (such as 'open antigravity' or 'open anti-gravty'), NEVER fall back to Chrome web search! Antigravity IDE is installed as a system snap application. When asked to close an application, call close_application with the target process name.\n"
                         "6. DOCUMENT GENERATION & MULTI-PAGE ADHERENCE: When asked to compose documents, extract the actual title (from 'titled ...' or 'called ...') and requested page count (e.g. '5 page', '3 pages'). Format both Word (.docx) and PDF documents with rich structured comparison tables, executive callout shapes, and metric cards. For multi-page requests, generate deep sections scaled to the requested length.\n"
                         "7. FILE SEARCH & NUMBERED SELECTION: When searching files, return all matching results across Documents, Downloads, Desktop, and project directories with numbered clickable links. When the user says 'open 1' or 'open file 1', open that exact file immediately.\n"
-                        "8. Provide a direct, concise final response (1-2 sentences maximum) summarizing the completed plan and actions."
+                        "8. FILE DELETION SAFETY: When asked to delete or remove a file, call 'delete_file' with the exact-case filename. File deletion is strictly case-sensitive and automatically triggers interactive user confirmation. The user holds the final deletion decision.\n"
+                        "9. Provide a direct, concise final response (1-2 sentences maximum) summarizing the completed plan and actions."
                     ),
                 }
                 messages = [system_msg, *self._chat_history[-8:], {"role": "user", "content": query}]
