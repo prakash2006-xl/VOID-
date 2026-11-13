@@ -31,10 +31,10 @@ DODAIOS_APP_URL = "http://127.0.0.1:47821/"
 
 # Locate Python binary dynamically
 candidate_pythons = [
-    sys.executable,
     str(SSD_VOID_DIR / ".venv/bin/python"),
     str(HOME_DIR / ".dodaios/.venv/bin/python"),
     str(HOME_DIR / ".void/.venv/bin/python"),
+    sys.executable,
     shutil.which("python3") or "python3"
 ]
 VENV_PYTHON = next((p for p in candidate_pythons if p and Path(p).is_file() and os.access(p, os.X_OK)), sys.executable)

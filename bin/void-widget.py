@@ -971,6 +971,31 @@ def kwin_shortcut(shortcut_name: str) -> bool:
     except Exception:
         return False
 
+def get_friendly_app_name(name: str) -> str:
+    clean = name.strip().lower()
+    friendly = {
+        "kcalc": "Calculator",
+        "calculator": "Calculator",
+        "calc": "Calculator",
+        "systemsettings": "System Settings",
+        "settings": "System Settings",
+        "system settings": "System Settings",
+        "chromium": "Chromium",
+        "chrome": "Chromium",
+        "browser": "Chromium",
+        "konsole": "Konsole",
+        "terminal": "Konsole",
+        "dolphin": "Dolphin",
+        "files": "Dolphin",
+        "file manager": "Dolphin",
+        "kate": "Kate",
+        "kwrite": "KWrite",
+        "vlc": "VLC",
+        "antigravity": "Antigravity IDE",
+        "antigravity-ide": "Antigravity IDE",
+    }
+    return friendly.get(clean, clean.title())
+
 def close_software_by_name(name: str) -> bool:
     clean = name.strip().lower()
     
@@ -1132,7 +1157,9 @@ def kwin_manage_app_window(app_name: str, action: str) -> bool:
             var cap = (w.caption || "").toLowerCase();
             if (res.indexOf("{target}") !== -1 || cap.indexOf("{target}") !== -1) {{
                 applyAction(w, "{act}");
-                break;
+                if ("{act}" !== "close" && "{act}" !== "minimize") {{
+                    break;
+                }}
             }}
         }}
     }}
@@ -1975,8 +2002,8 @@ def normalize_voice_intent(text: str) -> str:
         (r"\b(?:calcultor|calculater|caculator|calclator)\b", "calculator"),
         (r"\b(?:screnshot|screenshoot|screanshot|screenshit|snapsot)\b", "screenshot"),
         (r"\b(?:screen\s+short)\b", "screenshot"),
-        (r"\b(?:minimise|minamize|minmize)\b", "minimize"),
-        (r"\b(?:maximise|maxamize|maxmize)\b", "maximize"),
+        (r"\b(?:minimise|minamize|minmize|minima\s+is|minima\s+as|mini\s+mice|mini\s+my|minimse)\b", "minimize"),
+        (r"\b(?:maximise|maxamize|maxmize|maxima\s+is|maxima\s+as)\b", "maximize"),
         (r"\b(?:fulscreen|fullscrene|full\s+screne)\b", "fullscreen"),
         (r"\b(?:olama|o\s+llama|allama|alamma|ohlama)\b", "ollama"),
         (r"\b(?:rember|rememebr|remerber)\b", "remember"),
@@ -1991,7 +2018,13 @@ def normalize_voice_intent(text: str) -> str:
         (r"\b(?:filname|fiel|fle)\b", "file"),
         (r"\b(?:deleter|delte|dlete|delet|deler)\b", "delete"),
         (r"\b(?:tr[- ]?39|tr[- ]?thirty[- ]?nine|tr thirty nine)\b", "TR_39"),
-        (r"\b(?:hey\s+white|hay\s+white)\b", "hey void"),
+        (r"\b(?:hey\s+white|hay\s+white|hey\s+ward|hey\s+warren|hey\s+board|reward|a\s+ward|award)\b", "hey void"),
+        (r"\b(?:to\s+romeo|romeo)\b", "chromium"),
+        (r"\b(?:close\s+to\s+romeo)\b", "close chromium"),
+        (r"\b(?:applicaions|applicatons|appliactions|applicatn|aplication|applcation)\b", "applications"),
+        (r"\b(?:windw|windwo|wndow|widnow|windo)\b", "window"),
+        (r"\b(?:windws|windwos|wndows|widnows|windos)\b", "windows"),
+        (r"\b(?:evrything|everythng|evrythng|everyting)\b", "everything"),
         (r"\b(?:white\.zip|whit\.zip)\b", "VOID.zip"),
         (r"\b(?:close\s+the\s+tab|delete\s+the\s+tab|close\s+a\s+tab|close\s+this\s+tab|close\s+tab|delete\s+tab|close\s+current\s+tab|delete\s+current\s+tab)\b", "close current tab"),
         (r"\b(?:open\s+(?:a\s+)?new\s+tab|new\s+tab|open\s+tab)\b", "open new tab"),
@@ -2023,7 +2056,7 @@ def normalize_voice_intent(text: str) -> str:
     ]
     for pattern, rep in replacements:
         s = re.sub(pattern, rep, s, flags=re.I)
-    return s.strip()
+    return s.strip().rstrip(" .!?,;:")
 
 def extract_media_song_query(text: str) -> str:
     """
@@ -5455,22 +5488,24 @@ class AudioVoiceEngine(QObject):
                 return msg
             elif name == "close_application":
                 app = args.get("app_name", "")
+                disp = get_friendly_app_name(app)
                 close_software_by_name(app)
-                return f"Closed {app}"
+                return f"Closed {disp}."
             elif name == "manage_window":
                 action = args.get("action", "")
                 app_name = args.get("app_name", "")
                 if app_name:
                     kwin_manage_app_window(app_name, action)
+                    disp = get_friendly_app_name(app_name)
                     if action == "minimize":
-                        return f"Minimized {app_name.capitalize()}."
+                        return f"Minimized {disp}."
                     elif action == "close":
-                        return f"Closed {app_name.capitalize()}."
+                        return f"Closed {disp}."
                     elif action == "maximize":
-                        return f"Maximized {app_name.capitalize()}."
+                        return f"Maximized {disp}."
                     elif action == "fullscreen":
-                        return f"Fullscreened {app_name.capitalize()}."
-                    return f"{action.capitalize()}d {app_name.capitalize()}."
+                        return f"Fullscreened {disp}."
+                    return f"{action.capitalize()}d {disp}."
                 else:
                     if action == "close":
                         kwin_shortcut("Window Close")
@@ -5779,11 +5814,21 @@ class AudioVoiceEngine(QObject):
                 self.response_ready.emit(query, f'Transcribed: "{q_raw}"\n(Appended to {fname})', "🎙️ Dictating...", "")
                 return
 
-            q_clean = q_raw
-            for prefix in ["hey void", "void", "hi void", "hello void", "okay void", "hey white", "white", "hay white", "hey wait", "hey boy", "hey boyd", "boyd", "avoid"]:
+            q_clean = q_raw.strip().rstrip(" .!?,;:")
+            for prefix in [
+                "hey void", "void", "hi void", "hello void", "okay void",
+                "hey ward", "ward", "reward", "a ward", "award",
+                "hey warren", "warren",
+                "hey board", "board", "keyboard",
+                "hey boy", "hey boyd", "boyd", "avoid",
+                "hey white", "white", "hay white", "hey wait",
+                "k-wide", "k wide", "hey wide", "wide", "hay void",
+                "hey woy", "woyd", "voyd", "hey voyd"
+            ]:
                 if q_clean.lower().startswith(prefix):
                     q_clean = q_clean[len(prefix):].strip().lstrip(" ,.:;!?")
                     break
+            q_clean = q_clean.strip().rstrip(" .!?,;:")
 
             # 0. Anti-reintroduction fast path on empty wake-word or greeting
             if not q_clean or q_clean.lower() in ["hey", "hello", "hi", "are you there", "listen", "wake up"]:
@@ -5891,18 +5936,25 @@ class AudioVoiceEngine(QObject):
             return ("Task stopped by user.", "Cancelled", "")
 
         q_raw = query.strip()
-        q_clean = q_raw
+        q_clean = q_raw.strip().rstrip(" .!?,;:")
         for prefix in [
-            "hey void", "void", "hi void", "hello void", "okay void", "hey boy", "hey boyd", "boyd", "avoid",
-            "k-wide", "k wide", "keyboard", "white", "hay white", "hey white", "hay void"
+            "hey void", "void", "hi void", "hello void", "okay void",
+            "hey ward", "ward", "reward", "a ward", "award",
+            "hey warren", "warren",
+            "hey board", "board", "keyboard",
+            "hey boy", "hey boyd", "boyd", "avoid",
+            "hey white", "white", "hay white", "hey wait",
+            "k-wide", "k wide", "hey wide", "wide", "hay void",
+            "hey woy", "woyd", "voyd", "hey voyd"
         ]:
             if q_clean.lower().startswith(prefix):
                 q_clean = q_clean[len(prefix):].strip().lstrip(" ,.:;!?")
                 break
+        q_clean = q_clean.strip().rstrip(" .!?,;:")
 
         # Normalize STT typos
-        q_norm = normalize_voice_intent(q_clean)
-        q_lower = q_norm.lower()
+        q_norm = normalize_voice_intent(q_clean).strip().rstrip(" .!?,;:")
+        q_lower = q_norm.lower().strip().rstrip(" .!?,;:")
 
         # 0. Anti-reintroduction fast path
         if not q_lower or q_lower in ["hey", "hello", "hi", "are you there", "listen", "wake up"]:
@@ -6379,30 +6431,64 @@ class AudioVoiceEngine(QObject):
                 return (f"I don't have any saved memories matching '{target}'.", "Memory: Not Found", "")
 
         # 1. KWin DBus Window Management (Active & Targeted Sub-5ms Fast Path)
-        win_m = re.match(r"^(?:please\s+)?(close|minimize|minimise|maximize|maximise|fullscreen|restore|unminimize)\s*(?:the\s+|this\s+|current\s+|active\s+)?([a-zA-Z0-9_\-\s]*)$", q_lower)
+        win_m = re.match(
+            r"^(?:please\s+|can\s+you\s+(?:please\s+)?|could\s+you\s+(?:please\s+)?|would\s+you\s+(?:please\s+)?|will\s+you\s+(?:please\s+)?|kindly\s+|i\s+want\s+to\s+|i\s+want\s+you\s+to\s+|help\s+me\s+|go\s+ahead\s+and\s+)?(close|kill|quit|exit|shut\s+down|shut|minimize|minimise|hide|maximize|maximise|fullscreen|restore|unminimize)\s*(?:the\s+|this\s+|current\s+|active\s+)?([a-zA-Z0-9_\-\s]*?)[.!?]*$",
+            q_lower
+        )
         if win_m:
-            act = win_m.group(1)
-            if act in ["minimise"]: act = "minimize"
-            if act in ["maximise"]: act = "maximize"
-            if act in ["unminimize"]: act = "restore"
-            tgt = win_m.group(2).strip()
-            if not tgt or tgt in [
+            raw_act = win_m.group(1).lower()
+            raw_tgt = win_m.group(2).strip().lower().rstrip(" .!?,;:")
+            raw_tgt = re.sub(r"\b(?:please|kindly|now|for\s+me)\b", "", raw_tgt).strip()
+
+            act = "close"
+            if raw_act in ["minimize", "minimise", "hide"]:
+                act = "minimize"
+            elif raw_act in ["maximize", "maximise"]:
+                act = "maximize"
+            elif raw_act in ["restore", "unminimize"]:
+                act = "restore"
+            elif raw_act == "fullscreen":
+                act = "fullscreen"
+
+            clean_tgt = re.sub(r"\b(?:window|software|program|application|app|browser)\b", "", raw_tgt).strip()
+            clean_tgt = re.sub(r"\s+", " ", clean_tgt).strip()
+
+            tgt = clean_tgt
+            if not clean_tgt or raw_tgt in [
                 "it", "this", "window", "this window", "active window", "current window", "the window",
                 "screen", "app", "application", "the app", "this app", "current app", "active app"
             ]:
                 tgt = "window"
+            elif raw_tgt in ["all", "everything", "all windows", "all apps", "all applications", "all software"]:
+                tgt = "all"
+            elif raw_tgt in ["all tabs", "all chromium tabs", "all browser tabs", "tabs", "all tab"]:
+                tgt = "all tabs"
+            elif clean_tgt in ["chrome", "google chrome", "google", "chromium", "romeo"]:
+                tgt = "chromium"
+            elif clean_tgt in ["terminal", "konsole", "console"]:
+                tgt = "konsole"
+            elif clean_tgt in ["dolphin", "files", "file manager"]:
+                tgt = "dolphin"
+            elif clean_tgt in ["calc", "calculator", "kcalc"]:
+                tgt = "kcalc"
+            elif clean_tgt in ["settings", "system settings", "kde settings"]:
+                tgt = "systemsettings"
+            elif clean_tgt in ["editor", "text editor", "kwrite", "kate"]:
+                tgt = "kate"
+            elif not tgt:
+                tgt = raw_tgt
 
             if tgt == "window":
                 kwin_manage_app_window("window", act)
                 return (f"{act.title()}d window.", f"Window: {act.title()}", "")
-            elif tgt in ["all", "everything", "all windows", "all apps", "all applications", "all software"]:
+            elif tgt == "all":
                 if act == "close":
                     close_software_by_name("all")
                     return ("Closed all application windows.", "App: Close All", "")
                 else:
                     kwin_manage_app_window("all", act)
                     return (f"{act.title()}d all windows.", f"Window: {act.title()} All", "")
-            elif tgt in ["all tabs", "all chromium tabs", "all browser tabs", "tabs", "all tab"]:
+            elif tgt == "all tabs":
                 if act == "close":
                     kwin_manage_app_window("chromium", "close")
                     return ("Closed all tabs in Chromium.", "Chromium: All Tabs Closed", "")
@@ -6421,12 +6507,55 @@ class AudioVoiceEngine(QObject):
                 else:
                     return ("VOID assistant online.", "VOID: Status", "")
             elif tgt not in ["ollama", "void", "brain", "ai"]:
+                disp = get_friendly_app_name(tgt)
                 if act == "close":
                     close_software_by_name(tgt)
-                    return (f"Closed {tgt.title()}.", f"App: Close {tgt.title()}", "")
+                    return (f"Closed {disp}.", f"App: Close {disp}", "")
                 else:
                     kwin_manage_app_window(tgt, act)
-                    return (f"{act.title()}d {tgt.title()}.", f"Window: {act.title()} {tgt.title()}", "")
+                    return (f"{act.title()}d {disp}.", f"Window: {act.title()} {disp}", "")
+
+        # 1a. Conversational Generalization Fallback for Window & Application Management
+        # Catches conversational commands like "i asked it to close chromium", "can you please close down chromium", "minimize all applications"
+        is_close_word = any(w in q_lower for w in ["close", "kill", "quit", "exit", "shut down", "shut"])
+        is_min_word = any(w in q_lower for w in ["minimize", "minimise", "hide", "minima is", "minima as", "mini mice", "put down"])
+        is_max_word = any(w in q_lower for w in ["maximize", "maximise", "fullscreen"])
+
+        if is_close_word or is_min_word or is_max_word:
+            gen_act = "close" if is_close_word else ("minimize" if is_min_word else "maximize")
+            known_apps = [
+                ("all applications", "all"), ("all apps", "all"), ("all windows", "all"),
+                ("everything", "all"), ("all software", "all"),
+                ("chromium", "chromium"), ("chrome", "chromium"), ("browser", "chromium"), ("romeo", "chromium"),
+                ("terminal", "konsole"), ("konsole", "konsole"), ("console", "konsole"),
+                ("dolphin", "dolphin"), ("file manager", "dolphin"), ("files", "dolphin"),
+                ("calculator", "kcalc"), ("kcalc", "kcalc"),
+                ("system settings", "systemsettings"), ("settings", "systemsettings"),
+                ("text editor", "kate"), ("kwrite", "kwrite"), ("kate", "kate"),
+                ("vlc", "vlc"), ("antigravity", "antigravity"), ("ide", "antigravity"),
+            ]
+            matched_app = None
+            for trigger, mapped in known_apps:
+                if trigger in q_lower:
+                    matched_app = mapped
+                    break
+
+            if matched_app:
+                if matched_app == "all":
+                    if gen_act == "close":
+                        close_software_by_name("all")
+                        return ("Closed all application windows.", "App: Close All", "")
+                    else:
+                        kwin_manage_app_window("all", gen_act)
+                        return (f"{gen_act.title()}d all windows.", f"Window: {gen_act.title()} All", "")
+                elif matched_app not in ["ollama", "void", "brain", "ai"]:
+                    disp = get_friendly_app_name(matched_app)
+                    if gen_act == "close":
+                        close_software_by_name(matched_app)
+                        return (f"Closed {disp}.", f"App: Close {disp}", "")
+                    else:
+                        kwin_manage_app_window(matched_app, gen_act)
+                        return (f"{gen_act.title()}d {disp}.", f"Window: {gen_act.title()} {disp}", "")
 
         if any(p in q_lower for p in ["show desktop", "go to desktop", "minimize all"]):
             kwin_manage_app_window("all", "minimize")
@@ -7093,8 +7222,9 @@ if __name__ == "__main__":
                 self.terminate_requested.emit()
                 return ("Closing VOID assistant.", "VOID: Exit", "")
             if app not in ["window", "active window", "current window", "this", "ollama", "brain", "ai"]:
+                disp = get_friendly_app_name(app)
                 close_software_by_name(app)
-                return (f"Closed {app.title()}.", f"App: Close {app.title()}", "")
+                return (f"Closed {disp}.", f"App: Close {disp}", "")
 
         # 1g. Comprehensive Note Document Suite (Create, Append, List, Search, Export, Maintain)
         # A. Notes Maintenance & Cataloging
@@ -7748,7 +7878,8 @@ if __name__ == "__main__":
                 tool_triggers = [
                     "search web", "google", "find file", "look up", "note", "reminder", "remind me",
                     "email", "send mail", "take screenshot", "capture screen", "create document",
-                    "make pdf", "generate pdf", "save file", "open tab", "close tab"
+                    "make pdf", "generate pdf", "save file", "open tab", "close tab", "close", "minimize",
+                    "kill", "exit", "quit", "application", "window"
                 ]
                 needs_tools = any(t in query.lower() for t in tool_triggers)
 
@@ -7757,9 +7888,11 @@ if __name__ == "__main__":
                     chat_system_msg = {
                         "role": "system",
                         "content": (
-                            "You are VOID, the ultra-fast personal AI assistant on Fedora Linux. "
+                            "You are VOID, the ultra-fast personal autonomous AI assistant on Fedora Linux KDE Plasma. "
                             f"Context: {self.memory.get_context_summary()}\n"
-                            "Answer user queries clearly, concisely, and helpfully in 1-2 direct sentences."
+                            "You have full OS permissions to manage windows, launch and close applications, and control desktop tools. "
+                            "When the user asks to close, minimize, open, or manage applications, acknowledge with clear execution confirmation. "
+                            "Answer user queries clearly, concisely, and helpfully in 1-2 direct sentences without unnecessary preambles."
                         )
                     }
                     payload = {
