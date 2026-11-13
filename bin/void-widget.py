@@ -448,6 +448,20 @@ TOOLS_SCHEMA = [
     {
         "type": "function",
         "function": {
+            "name": "browser_switch_tab",
+            "description": "Switch tabs in Chromium (next tab, previous tab, or specific tab number 1-9).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "target": {"type": "string", "description": "Target tab: 'next', 'previous', or a number '1'-'9' (or 'last')"}
+                },
+                "required": ["target"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "browser_search",
             "description": "Perform a live Google or DuckDuckGo search directly inside Chromium browser on screen.",
             "parameters": {
@@ -1897,6 +1911,9 @@ def normalize_voice_intent(text: str) -> str:
         (r"\b(?:close\s+the\s+tab|delete\s+the\s+tab|close\s+a\s+tab|close\s+this\s+tab|close\s+tab|delete\s+tab|close\s+current\s+tab|delete\s+current\s+tab)\b", "close current tab"),
         (r"\b(?:open\s+(?:a\s+)?new\s+tab|new\s+tab|open\s+tab)\b", "open new tab"),
         (r"\b(?:open\s+(?:a\s+)?new\s+(?:chromium\s+|browser\s+)?window|new\s+window)\b", "open new window"),
+        (r"\b(?:nex\s+tab|nest\s+tab|nxt\s+tab)\b", "next tab"),
+        (r"\b(?:perv\s+tab|previuos\s+tab|privious\s+tab|previus\s+tab)\b", "previous tab"),
+        (r"\b(?:swich\s+tab|switch\s+tab)\b", "switch tab"),
         (r"\b(?:documnt|docment|dcoument)\b", "document"),
         (r"\b(?:can\s+cel)\b", "cancel"),
         (r"\b(?:cerate|creat)\b", "create"),
@@ -3521,6 +3538,63 @@ class DodaiosToolHub:
             return True, "Closed current tab in Chromium."
         except Exception as e:
             return False, f"Could not close Chromium tab: {e}"
+
+    def switch_chromium_tab(self, direction_or_index: str | int = "next") -> tuple[bool, str]:
+        """Switches tabs in the active Chromium window.
+        Supported options:
+          - "next" (Ctrl+Tab)
+          - "prev" / "previous" (Ctrl+Shift+Tab)
+          - 1 to 8 (Ctrl+1 to Ctrl+8)
+          - 9 / "last" (Ctrl+9)
+        """
+        kwin_manage_app_window("chromium", "activate")
+        time.sleep(0.12)
+
+        key_combo_xdo = "ctrl+Tab"
+        pyauto_keys = ('ctrl', 'tab')
+        action_name = "next tab"
+
+        if isinstance(direction_or_index, int) or (isinstance(direction_or_index, str) and direction_or_index.isdigit()):
+            num = int(direction_or_index)
+            num = max(1, min(9, num))
+            key_combo_xdo = f"ctrl+{num}"
+            pyauto_keys = ('ctrl', str(num))
+            action_name = f"tab {num}" if num < 9 else "last tab"
+        elif str(direction_or_index).lower() in ["prev", "previous", "prior", "back"]:
+            key_combo_xdo = "ctrl+shift+Tab"
+            pyauto_keys = ('ctrl', 'shift', 'tab')
+            action_name = "previous tab"
+        elif str(direction_or_index).lower() in ["last", "last tab", "end"]:
+            key_combo_xdo = "ctrl+9"
+            pyauto_keys = ('ctrl', '9')
+            action_name = "last tab"
+        elif str(direction_or_index).lower() in ["first", "first tab", "start"]:
+            key_combo_xdo = "ctrl+1"
+            pyauto_keys = ('ctrl', '1')
+            action_name = "first tab"
+        else:
+            key_combo_xdo = "ctrl+Tab"
+            pyauto_keys = ('ctrl', 'tab')
+            action_name = "next tab"
+
+        # 1. Attempt xdotool key dispatch
+        try:
+            res = subprocess.run(
+                ["xdotool", "search", "--onlyvisible", "--class", "chromium", "windowactivate", "--sync", "key", "--clearmodifiers", key_combo_xdo],
+                capture_output=True, text=True, timeout=1.5
+            )
+            if res.returncode == 0:
+                return True, f"Switched to {action_name} in Chromium."
+        except Exception:
+            pass
+
+        # 2. Fallback to pyautogui
+        try:
+            import pyautogui
+            pyautogui.hotkey(*pyauto_keys)
+            return True, f"Switched to {action_name} in Chromium."
+        except Exception as e:
+            return False, f"Could not switch Chromium tab: {e}"
 
     def browser_search(self, query: str, engine: str = "google") -> str:
         """Performs a web search directly inside Chromium on screen."""
@@ -5256,6 +5330,10 @@ class AudioVoiceEngine(QObject):
             elif name == "browser_close_tab":
                 ok, msg = self.tool_hub.close_chromium_tab()
                 return msg
+            elif name == "browser_switch_tab":
+                tgt = args.get("target", "next")
+                ok, msg = self.tool_hub.switch_chromium_tab(tgt)
+                return msg
             elif name == "create_document":
                 p = args.get("path", "")
                 c = args.get("content", "")
@@ -6146,6 +6224,33 @@ class AudioVoiceEngine(QObject):
                 url_to_open = m_url.group(1).strip() if m_url else "chrome://newtab"
                 msg = self.tool_hub.open_chromium_tab(url_to_open)
                 return (msg, "Chromium: New Tab", "")
+
+        # 1c4. Tab Switcher Navigation Fast Path ("next tab", "previous tab", "tab 2", "tab 1", "last tab", etc.)
+        tab_num_m = (
+            re.search(r"^(?:please\s+)?(?:switch\s+to\s+|go\s+to\s+)?tab\s+(\d+|first|second|third|fourth|fifth|sixth|seventh|eighth|last)(?:\s+in\s+chromium|\s+in\s+browser)?$", q_lower) or
+            re.search(r"^(?:please\s+)?(?:switch\s+to\s+|go\s+to\s+)?(?:the\s+)?(first|second|third|fourth|fifth|sixth|seventh|eighth|last)\s+tab(?:\s+in\s+chromium|\s+in\s+browser)?$", q_lower)
+        )
+        if tab_num_m:
+            raw_target = tab_num_m.group(1).strip().lower()
+            ord_map = {
+                "first": 1, "1st": 1, "second": 2, "2nd": 2, "third": 3, "3rd": 3,
+                "fourth": 4, "4th": 4, "fifth": 5, "5th": 5, "sixth": 6, "6th": 6,
+                "seventh": 7, "7th": 7, "eighth": 8, "8th": 8, "last": 9
+            }
+            tab_idx = ord_map.get(raw_target, raw_target)
+            ok, msg = self.tool_hub.switch_chromium_tab(tab_idx)
+            badge_name = f"Tab {tab_idx}" if str(tab_idx).isdigit() and int(tab_idx) < 9 else ("Last Tab" if str(tab_idx) in ["9", "last"] else f"Tab {raw_target}")
+            return (msg, f"Chromium: {badge_name}", "")
+
+        is_tab_switch_dir = bool(
+            re.search(r"\b(?:next\s+tab|switch\s+(?:to\s+)?next\s+tab|next\s+chromium\s+tab)\b", q_lower) or
+            re.search(r"\b(?:previous\s+tab|prev\s+tab|switch\s+(?:to\s+)?previous\s+tab|switch\s+(?:to\s+)?prev\s+tab|previous\s+chromium\s+tab)\b", q_lower)
+        )
+        if is_tab_switch_dir:
+            direction = "prev" if any(k in q_lower for k in ["prev", "previous", "prior", "back"]) else "next"
+            ok, msg = self.tool_hub.switch_chromium_tab(direction)
+            badge_name = "Prev Tab" if direction == "prev" else "Next Tab"
+            return (msg, f"Chromium: {badge_name}", "")
 
         # 1d. Explicit Browser Web Search (Only when explicitly asked to search inside browser)
         b_search = (
