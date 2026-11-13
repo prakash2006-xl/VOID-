@@ -4750,6 +4750,10 @@ class AudioVoiceEngine(QObject):
         self._preroll: collections.deque[np.ndarray] = collections.deque(maxlen=6)
         self._chat_history: list[dict[str, Any]] = []
         self._silence_chunks = 0
+        self._command_start_time: float = 0.0
+        self._last_speech_time: float = 0.0
+        self._has_spoken: bool = False
+        self._ambient_rms: float = 0.010
         self.task_mgr = TaskManager()
         self.memory = MemoryEngine(mem_dir=MEMORY_DIR)
         self._abort_requested = threading.Event()
@@ -4904,6 +4908,15 @@ class AudioVoiceEngine(QObject):
         self._mode = "command"
         self._audio_buffer = list(self._preroll)
         self._silence_chunks = 0
+        now = time.time()
+        self._command_start_time = now
+        self._last_speech_time = now
+        self._has_spoken = False
+        if self._preroll:
+            preroll_rms = [float(np.sqrt(np.mean(p.astype(np.float32) ** 2))) / 32768.0 for p in self._preroll]
+            self._ambient_rms = max(0.005, min(0.025, float(np.mean(preroll_rms))))
+        else:
+            self._ambient_rms = 0.010
         self.state_changed.emit("listening")
 
     def _start_audio_stream(self) -> None:
@@ -4951,13 +4964,33 @@ class AudioVoiceEngine(QObject):
 
                             if self._mode == "command":
                                 self._audio_buffer.append(samples)
-                                if rms < 0.008:
+
+                                # Dynamic voice activity detection (VAD)
+                                speech_threshold = max(0.016, self._ambient_rms * 1.8)
+                                silence_threshold = max(0.010, self._ambient_rms * 1.25)
+
+                                if rms >= speech_threshold:
+                                    self._has_spoken = True
+                                    self._last_speech_time = now
+                                    self._silence_chunks = 0
+                                elif rms < silence_threshold:
                                     self._silence_chunks += 1
                                 else:
-                                    self._silence_chunks = 0
+                                    if self._has_spoken:
+                                        self._silence_chunks += 1
 
-                                # End of command utterance: ~1500ms silence or 12s max
-                                if (self._silence_chunks >= 32 and len(self._audio_buffer) >= 10) or len(self._audio_buffer) > 450:
+                                silence_duration = now - self._last_speech_time
+                                total_duration = now - self._command_start_time
+
+                                # Requirement: If the user stays silent for 3 seconds, automatically stop listening and start execution
+                                if self._has_spoken and (self._silence_chunks >= 30 or silence_duration >= 3.0):
+                                    print(f"[VOID Audio] 3s silence detected after speech (chunks={self._silence_chunks}, dur={silence_duration:.2f}s). Starting execution.", flush=True)
+                                    self._finish_utterance_and_process()
+                                elif not self._has_spoken and total_duration >= 3.0:
+                                    print(f"[VOID Audio] 3s initial silence (no speech detected). Ending listening.", flush=True)
+                                    self._finish_utterance_and_process()
+                                elif len(self._audio_buffer) >= 150:
+                                    print("[VOID Audio] Maximum command duration reached (15s). Processing.", flush=True)
                                     self._finish_utterance_and_process()
 
                             elif self._mode == "wake" and self._wake_enabled and self._recognizer:

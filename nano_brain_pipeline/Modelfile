@@ -1,0 +1,17 @@
+FROM /run/media/prakash/TR_39/VOID/nano_brain_pipeline/output/nano-brain-merged.gguf
+
+TEMPLATE """<|im_start|>system
+{{ .System }}<|im_end|>
+<|im_start|>user
+{{ .Prompt }}<|im_end|>
+<|im_start|>assistant
+"""
+
+SYSTEM """You are nano-brain, an ultra-lite, low-memory AI assistant built for AMD Ryzen 7 5700U on Fedora Linux. You provide concise, intelligent, and helpful responses while consuming strictly less than 1 GB of memory."""
+
+PARAMETER stop "<|im_start|>"
+PARAMETER stop "<|im_end|>"
+PARAMETER temperature 0.6
+PARAMETER top_p 0.9
+PARAMETER num_ctx 512
+PARAMETER num_thread 4
