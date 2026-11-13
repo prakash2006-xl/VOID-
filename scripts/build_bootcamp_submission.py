@@ -584,3 +584,4 @@ if __name__ == "__main__":
     generate_submission_checklist()
     generate_presentation_content()
     generate_project_deck_pptx()
+

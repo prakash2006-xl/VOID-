@@ -750,3 +750,4 @@ def generate_master_report_docx():
 if __name__ == "__main__":
     generate_master_report_pdf()
     generate_master_report_docx()
+
