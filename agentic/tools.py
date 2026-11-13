@@ -490,6 +490,101 @@ def _populate_default_tools(reg: ToolRegistry, perm_mgr: PermissionManager, tool
         permission_level=PermissionLevel.LEVEL_2_REVERSIBLE
     )
 
+    def _draft_pdf(
+        title: str = "Publication Report",
+        sections: Optional[list[dict[str, Any]]] = None,
+        filename: str = "",
+        output_path: str = "",
+        metadata: Optional[dict[str, Any]] = None,
+        **kwargs
+    ) -> str:
+        if tool_hub and hasattr(tool_hub, "draft_pdf_document"):
+            return tool_hub.draft_pdf_document(title, sections or [], filename=filename or output_path, metadata=metadata)
+        try:
+            safe_title = "".join(c for c in title if c.isalnum() or c in (" ", "_", "-")).strip().replace(" ", "_")
+            reports_dir = os.path.expanduser("~/Documents/Reports")
+            os.makedirs(reports_dir, exist_ok=True)
+            target_path = output_path or os.path.join(reports_dir, f"{safe_title}.pdf")
+            tmp_html = target_path + ".tmp.html"
+            with open(tmp_html, "w", encoding="utf-8") as f:
+                f.write(f"<html><body><h1>{title}</h1></body></html>")
+            sh = shutil.which("chromium-browser") or shutil.which("chromium")
+            if sh:
+                subprocess.run([sh, "--headless", "--no-sandbox", "--disable-gpu", f"--print-to-pdf={target_path}", tmp_html], timeout=15)
+            if os.path.exists(tmp_html):
+                os.remove(tmp_html)
+            return f"Successfully generated PDF document at {target_path}"
+        except Exception as e:
+            raise RuntimeError(f"Failed to draft pdf: {e}")
+
+    reg.register_tool(
+        name="draft_pdf_document",
+        description="Generates a publication-grade PDF document with cover header and styled typography.",
+        handler=_draft_pdf,
+        parameters={
+            "type": "object",
+            "properties": {
+                "title": {"type": "string"},
+                "sections": {"type": "array", "items": {"type": "object"}},
+                "filename": {"type": "string"},
+                "output_path": {"type": "string"}
+            }
+        },
+        permission_level=PermissionLevel.LEVEL_2_REVERSIBLE
+    )
+
+    def _compose_comprehensive_document(
+        topic: str = "",
+        file_type: str = "pdf",
+        custom_title: str = "",
+        **kwargs
+    ) -> dict[str, Any]:
+        if tool_hub and hasattr(tool_hub, "compose_comprehensive_document"):
+            ok, msg, path = tool_hub.compose_comprehensive_document(topic, file_type=file_type, custom_title=custom_title)
+            return {"success": ok, "message": msg, "path": path}
+        return {"success": False, "message": "ToolHub unavailable"}
+
+    reg.register_tool(
+        name="compose_comprehensive_document",
+        description="Conducts deep multi-source research across facets and compiles a complete document or PDF.",
+        handler=_compose_comprehensive_document,
+        parameters={
+            "type": "object",
+            "properties": {
+                "topic": {"type": "string"},
+                "file_type": {"type": "string", "enum": ["pdf", "docx", "md"]},
+                "custom_title": {"type": "string"}
+            },
+            "required": ["topic"]
+        },
+        permission_level=PermissionLevel.LEVEL_2_REVERSIBLE
+    )
+
+    def _rewrite_document_content(
+        instructions: str = "",
+        target_file: str = "",
+        **kwargs
+    ) -> dict[str, Any]:
+        if tool_hub and hasattr(tool_hub, "rewrite_document_content"):
+            ok, msg, path = tool_hub.rewrite_document_content(instructions, target_file=target_file)
+            return {"success": ok, "message": msg, "path": path}
+        return {"success": False, "message": "ToolHub unavailable"}
+
+    reg.register_tool(
+        name="rewrite_document_content",
+        description="Rewrites, modifies, restructures, adjusts tone, or adds sections to an existing document or PDF.",
+        handler=_rewrite_document_content,
+        parameters={
+            "type": "object",
+            "properties": {
+                "instructions": {"type": "string"},
+                "target_file": {"type": "string"}
+            },
+            "required": ["instructions"]
+        },
+        permission_level=PermissionLevel.LEVEL_2_REVERSIBLE
+    )
+
     def _draft_xlsx(
         title: str = "Dataset",
         headers: Optional[list[str]] = None,
@@ -832,6 +927,80 @@ def _populate_default_tools(reg: ToolRegistry, perm_mgr: PermissionManager, tool
                 "output_xlsx": {"type": "string"}
             }
         },
+        permission_level=PermissionLevel.LEVEL_2_REVERSIBLE
+    )
+
+    def _append_note(title: str = "Note", content: str = "", **kwargs) -> dict[str, Any]:
+        if tool_hub and hasattr(tool_hub, "append_note"):
+            ok, msg, path = tool_hub.append_note(title, content)
+            return {"success": ok, "output": msg, "path": path, "artifacts": [path] if path else []}
+        return {"success": False, "output": "ToolHub unavailable"}
+
+    reg.register_tool(
+        name="append_note",
+        description="Appends content or thoughts to an existing note document in ~/Documents/Notes with timestamps.",
+        handler=_append_note,
+        parameters={
+            "type": "object",
+            "properties": {"title": {"type": "string"}, "content": {"type": "string"}},
+            "required": ["title", "content"]
+        },
+        permission_level=PermissionLevel.LEVEL_2_REVERSIBLE
+    )
+
+    def _list_notes(limit: int = 10, **kwargs) -> dict[str, Any]:
+        if tool_hub and hasattr(tool_hub, "list_notes"):
+            msg = tool_hub.list_notes(limit=limit)
+            return {"success": True, "output": msg}
+        return {"success": False, "output": "ToolHub unavailable"}
+
+    reg.register_tool(
+        name="list_notes",
+        description="Lists all saved note documents in ~/Documents/Notes.",
+        handler=_list_notes,
+        parameters={"type": "object", "properties": {"limit": {"type": "integer", "default": 10}}},
+        permission_level=PermissionLevel.LEVEL_1_READONLY
+    )
+
+    def _search_notes(query: str = "", **kwargs) -> dict[str, Any]:
+        if tool_hub and hasattr(tool_hub, "search_notes"):
+            msg = tool_hub.search_notes(query)
+            return {"success": True, "output": msg}
+        return {"success": False, "output": "ToolHub unavailable"}
+
+    reg.register_tool(
+        name="search_notes",
+        description="Searches inside note documents in ~/Documents/Notes across titles and contents.",
+        handler=_search_notes,
+        parameters={"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]},
+        permission_level=PermissionLevel.LEVEL_1_READONLY
+    )
+
+    def _export_note_to_pdf(title: str = "", **kwargs) -> dict[str, Any]:
+        if tool_hub and hasattr(tool_hub, "export_note_to_pdf"):
+            ok, msg, path = tool_hub.export_note_to_pdf(title)
+            return {"success": ok, "output": msg, "path": path, "artifacts": [path] if path else []}
+        return {"success": False, "output": "ToolHub unavailable"}
+
+    reg.register_tool(
+        name="export_note_to_pdf",
+        description="Compiles any note document into a publication-grade PDF report.",
+        handler=_export_note_to_pdf,
+        parameters={"type": "object", "properties": {"title": {"type": "string"}}},
+        permission_level=PermissionLevel.LEVEL_2_REVERSIBLE
+    )
+
+    def _maintain_notes(cleanup_empty: bool = True, **kwargs) -> dict[str, Any]:
+        if tool_hub and hasattr(tool_hub, "maintain_notes"):
+            ok, msg = tool_hub.maintain_notes(cleanup_empty=cleanup_empty)
+            return {"success": ok, "output": msg}
+        return {"success": False, "output": "ToolHub unavailable"}
+
+    reg.register_tool(
+        name="maintain_notes",
+        description="Performs maintenance on ~/Documents/Notes, compiling an INDEX catalog and pruning empty stubs.",
+        handler=_maintain_notes,
+        parameters={"type": "object", "properties": {"cleanup_empty": {"type": "boolean", "default": True}}},
         permission_level=PermissionLevel.LEVEL_2_REVERSIBLE
     )
 

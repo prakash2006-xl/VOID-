@@ -69,6 +69,7 @@ class AgentActivityCard(QFrame):
 
     if SignalClass:
         approval_resolved = SignalClass(str, bool)  # request_id, approved
+        close_requested = SignalClass()
 
     def __init__(self, permission_manager: Optional[PermissionManager] = None, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -126,6 +127,27 @@ class AgentActivityCard(QFrame):
         self._duration_label = QLabel("0.0s", self)
         self._duration_label.setStyleSheet("color: #64748b; font-size: 10px;")
         header_row.addWidget(self._duration_label)
+
+        close_btn = QPushButton("✕", self)
+        close_btn.setFixedSize(18, 18)
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor if hasattr(Qt, "CursorShape") else 13)
+        close_btn.setToolTip("Close Multi-Agent Activity Card")
+        close_btn.setStyleSheet("""
+            QPushButton {
+                color: #94a3b8;
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 9px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: rgba(239, 68, 68, 0.5);
+                color: #ffffff;
+            }
+        """)
+        close_btn.clicked.connect(self._on_close_clicked)
+        header_row.addWidget(close_btn)
         layout.addLayout(header_row)
 
         # 2. Current Task Headline
@@ -370,6 +392,11 @@ class AgentActivityCard(QFrame):
             if hasattr(self, "approval_resolved"):
                 self.approval_resolved.emit(self.active_request_id, False)
             self._approval_panel.setVisible(False)
+
+    def _on_close_clicked(self):
+        if SignalClass and hasattr(self, "close_requested"):
+            self.close_requested.emit()
+        self.setVisible(False)
 
 
 class CompactExecutionPopup(QWidget):

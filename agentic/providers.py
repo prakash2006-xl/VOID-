@@ -18,6 +18,22 @@ import httpx
 DEFAULT_OLLAMA_URL = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 DEFAULT_LOCAL_MODEL = "lfm3-omni:2b"
 
+def is_valid_api_key(key: Optional[str]) -> bool:
+    """Validates whether an API key is a genuine secret and not an empty or placeholder string."""
+    if not key or not isinstance(key, str):
+        return False
+    k = key.strip()
+    if len(k) < 18:
+        return False
+    placeholders = [
+        "1234567890abcdef", "abcdef1234567890", "1234567890abcdef1234",
+        "sk-proj-1234", "dummy", "example", "placeholder", "your-api-key",
+        "sk-or-v1-abcdef", "gsk_1234", "sk-deepseek-1234", "sk-proj-******"
+    ]
+    if any(p in k for p in placeholders):
+        return False
+    return True
+
 class BaseAIProvider(ABC):
     name: str = "base"
     is_local: bool = True
@@ -108,8 +124,8 @@ class CloudOpenAICompatibleProvider(BaseAIProvider):
         return f"{self.api_key[:4]}...{self.api_key[-4:]}"
 
     def generate(self, prompt: str, system: str = "", temperature: float = 0.3, max_tokens: int = 1024) -> str:
-        if not self.api_key:
-            raise ValueError("Cloud provider selected but no API key is configured.")
+        if not is_valid_api_key(self.api_key):
+            raise ValueError("Cloud provider selected but no valid API key is configured.")
         url = f"{self.api_base}/chat/completions"
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -232,37 +248,74 @@ class AIProviderManager:
     def route_hierarchical(self, agent_role: Any = None, task_type: str = "general") -> tuple[BaseAIProvider, str]:
         """
         Implements the mandatory 4-tier model routing priority:
-        1. Assigned cloud model for the requested agent.
-        2. Configured alternative cloud model/provider.
-        3. Configured local Ollama model.
+        1. Assigned cloud model for the requested agent (if mode is cloud/hybrid and key is valid).
+        2. Configured alternative cloud model/provider (if mode is cloud/hybrid and key is valid).
+        3. Configured local Ollama model (offline default).
         4. Default System Agent — mandatory final fallback.
         """
         role_key = agent_role.value if hasattr(agent_role, "value") else str(agent_role).lower() if agent_role else "general"
 
-        # Tier 1: Check assigned cloud model for requested agent
-        if self.mode != "local":
+        # Tier 1: Check assigned cloud model for requested agent (only in cloud/hybrid mode with genuine key)
+        if self.mode in ("cloud", "hybrid"):
             assignment = self.agent_model_assignments.get(role_key)
             if assignment:
                 prof_name = assignment.get("profile")
                 if prof_name and prof_name != "ollama_local":
                     profile = self.profiles.get(prof_name)
-                    if profile and profile.get("enabled", True) and profile.get("api_key"):
+                    if profile and profile.get("enabled", True) and is_valid_api_key(profile.get("api_key")):
                         prov = self._get_or_create_cloud_provider(prof_name, assignment.get("model"))
                         return prov, f"Tier 1: Assigned Cloud ({prof_name}:{prov.model})"
 
-        # Tier 2: Configured alternative cloud model/provider
-        if self.mode != "local":
+        # Tier 2: Configured alternative cloud model/provider (only in cloud/hybrid mode with genuine key)
+        if self.mode in ("cloud", "hybrid"):
             for p_name, p_data in self.profiles.items():
-                if p_name != "ollama_local" and p_data.get("enabled", True) and p_data.get("api_key"):
+                if p_name != "ollama_local" and p_data.get("enabled", True) and is_valid_api_key(p_data.get("api_key")):
                     prov = self._get_or_create_cloud_provider(p_name, p_data.get("default_model"))
                     return prov, f"Tier 2: Alternative Cloud ({p_name}:{prov.model})"
 
-        # Tier 3: Configured local Ollama model
+        # Tier 3: Configured local Ollama model (default offline brain)
         if self.is_local_online():
             return self.local_provider, f"Tier 3: Local Ollama ({self.local_provider.model})"
 
         # Tier 4: Default System Agent — mandatory final fallback
         return self.default_system_provider, "Tier 4: Default System Agent (Offline Fallback)"
+
+    def generate_with_fallback(
+        self,
+        prompt: str,
+        system: str = "",
+        temperature: float = 0.3,
+        max_tokens: int = 512,
+        agent_role: Any = None
+    ) -> tuple[str, str]:
+        """
+        Generates completion with guaranteed 4-tier fallback hierarchy:
+        Attempts assigned/routed provider; if it errors, times out, or lacks credentials,
+        automatically falls back down the hierarchy to Local Ollama and Default System Agent.
+        Guarantees zero unhandled crashes.
+        Returns: (response_text, tier_used_str)
+        """
+        prov, tier_info = self.route_hierarchical(agent_role)
+        try:
+            res = prov.generate(prompt, system=system, temperature=temperature, max_tokens=max_tokens)
+            if res and not res.startswith("[Cloud Provider:"):
+                return res, tier_info
+        except Exception as e:
+            import logging
+            logging.getLogger("VOID.AIProvider").warning(f"Provider {prov.name} failed ({e}), initiating fallback...")
+
+        # Fallback to Tier 3: Local Ollama
+        if prov != self.local_provider and self.is_local_online():
+            try:
+                res = self.local_provider.generate(prompt, system=system, temperature=temperature, max_tokens=max_tokens)
+                if res:
+                    return res, f"Tier 3: Local Ollama ({self.local_provider.model})"
+            except Exception:
+                pass
+
+        # Final Fallback to Tier 4: Default System Provider
+        res = self.default_system_provider.generate(prompt, system=system, temperature=temperature, max_tokens=max_tokens)
+        return res, "Tier 4: Default System Agent"
 
     def _get_or_create_cloud_provider(self, profile_name: str, model_name: Optional[str] = None) -> BaseAIProvider:
         p_data = self.profiles.get(profile_name, {})
@@ -412,8 +465,12 @@ class AIProviderManager:
         return bool(status.get("online", False))
 
     def is_cloud_configured(self) -> bool:
-        """Checks if a valid cloud provider with API key is loaded."""
-        return self.cloud_provider is not None and bool(getattr(self.cloud_provider, "api_key", ""))
+        """Checks if a valid cloud provider with functional API key is loaded."""
+        return (
+            self.mode in ("cloud", "hybrid") and
+            self.cloud_provider is not None and
+            is_valid_api_key(getattr(self.cloud_provider, "api_key", ""))
+        )
 
     def configure_cloud(
         self,

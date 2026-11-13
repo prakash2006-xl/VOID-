@@ -44,6 +44,34 @@ class ResearchProductivityAgent(BaseAgent):
                 "output_path": output_path,
             })
 
+        elif action == "generate_pdf":
+            title = task.tool_args.get("title", "Technical Executive Summary")
+            sections = task.tool_args.get("sections", [])
+            output_path = task.tool_args.get("output_path")
+            return self.tools.execute("draft_pdf_document", {
+                "title": title,
+                "sections": sections,
+                "output_path": output_path,
+            })
+
+        elif action == "compose_document":
+            topic = task.tool_args.get("topic", "Autonomous Systems")
+            file_type = task.tool_args.get("file_type", "pdf")
+            custom_title = task.tool_args.get("custom_title", "")
+            return self.tools.execute("compose_comprehensive_document", {
+                "topic": topic,
+                "file_type": file_type,
+                "custom_title": custom_title,
+            })
+
+        elif action == "rewrite_document":
+            instructions = task.tool_args.get("instructions", "Refine content")
+            target_file = task.tool_args.get("target_file", "")
+            return self.tools.execute("rewrite_document_content", {
+                "instructions": instructions,
+                "target_file": target_file,
+            })
+
         elif action == "generate_xlsx":
             title = task.tool_args.get("title", "Research Dataset")
             headers = task.tool_args.get("headers", [])
@@ -73,6 +101,27 @@ class ResearchProductivityAgent(BaseAgent):
                 "path": note_path,
                 "content": note_content,
             })
+
+        elif action == "append_note":
+            title = task.tool_args.get("title", "Note")
+            content = task.tool_args.get("content", "")
+            return self.tools.execute("append_note", {"title": title, "content": content})
+
+        elif action == "list_notes":
+            limit = task.tool_args.get("limit", 10)
+            return self.tools.execute("list_notes", {"limit": limit})
+
+        elif action == "search_notes":
+            query = task.tool_args.get("query", "")
+            return self.tools.execute("search_notes", {"query": query})
+
+        elif action == "export_note_to_pdf":
+            title = task.tool_args.get("title", "")
+            return self.tools.execute("export_note_to_pdf", {"title": title})
+
+        elif action == "maintain_notes":
+            cleanup = task.tool_args.get("cleanup_empty", True)
+            return self.tools.execute("maintain_notes", {"cleanup_empty": cleanup})
 
         elif action == "web_read":
             url = task.tool_args.get("url")
