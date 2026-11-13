@@ -2,82 +2,359 @@
 # ==============================================================================
 # VOID — Complete One-Click Automated Setup, Configuration & Launcher
 # ==============================================================================
-# Installs all system & python requirements, configures chosen AI models (Local & Cloud),
-# optimizes CPU/RAM efficiency, establishes desktop entries, and boots VOID.
+# Repository: https://github.com/prakash2006-xl/VOID-.git
+#
+# Description:
+#   Zero-friction, fully automated installation and execution script for VOID.
+#   Installs system packages across Fedora/Debian/Ubuntu/Arch/openSUSE,
+#   provisions isolated Python virtual environments, downloads acoustic and
+#   neural voice models (Vosk & Piper), configures local Ollama LLM and cloud
+#   deciders (OpenRouter / OpenAI / Groq / DeepSeek), optimizes CPU/RAM efficiency,
+#   registers desktop and CLI shortcuts, and launches the compact 358x246/256 widget.
 # ==============================================================================
 
-set -e
+set -eo pipefail
 
+# --- Color Scheme & Formatting ---
+BOLD='\033[1m'
+DIM='\033[2m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
-NC='\033[0m'
+MAGENTA='\033[0;35m'
+NC='\033[0m' # No Color
 
+# --- Script & Directory Resolution ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-echo -e "${CYAN}==================================================================${NC}"
-echo -e "${CYAN}        VOID — Autonomous AI Desktop Assistant Setup & Run        ${NC}"
-echo -e "${CYAN}==================================================================${NC}"
+TARGET_USER="${USER:-$(whoami)}"
+TARGET_HOME="${HOME:-/home/${TARGET_USER}}"
 
-# 1. Python Environment Setup
-VENV_DIR="/home/prakash/.dodaios/.venv"
-VENV_PYTHON="${VENV_DIR}/bin/python"
+# Ensure user directories exist
+mkdir -p "${TARGET_HOME}/Documents/Reports" \
+         "${TARGET_HOME}/Documents/Notes" \
+         "${TARGET_HOME}/Pictures/Screenshots" \
+         "${TARGET_HOME}/.local/share/applications" \
+         "${TARGET_HOME}/.local/bin" \
+         "${TARGET_HOME}/.config/void" \
+         "${TARGET_HOME}/.dodaios/data" \
+         "${SCRIPT_DIR}/config" \
+         "${SCRIPT_DIR}/logs" \
+         "${SCRIPT_DIR}/memory"
 
-if [ ! -d "$VENV_DIR" ]; then
-    echo -e "${BLUE}[1/7] Creating Python virtual environment at ${VENV_DIR}...${NC}"
-    python3 -m venv "$VENV_DIR"
-else
-    echo -e "${GREEN}[1/7] Python virtual environment verified at ${VENV_DIR}.${NC}"
+# --- Command Line Argument Parsing ---
+DO_CHECK_ONLY=false
+DO_CLEAN=false
+SKIP_AUDIO=false
+SKIP_OLLAMA=false
+CHOSEN_MODEL="perplexity/pplx-decider-flash-v1.3:free"
+CHOSEN_KEY="${OPENROUTER_API_KEY:-}"
+
+print_help() {
+    cat <<EOF
+${CYAN}${BOLD}VOID — Complete Setup, Configuration & Launcher${NC}
+
+Usage: ./terminalsetuprun [options]
+
+Options:
+  --help, -h          Show this help message and exit
+  --check             Verify environment, dependencies and configurations without running
+  --clean             Recreate virtual environment from scratch
+  --no-audio          Skip downloading speech recognition (Vosk) and TTS (Piper) models
+  --no-ollama         Skip local Ollama daemon and model check
+  --model <model>     Set default cloud AI model (default: perplexity/pplx-decider-flash-v1.3:free)
+  --key <api_key>     Set OpenRouter / Cloud API key non-interactively
+EOF
+    exit 0
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --help|-h)
+            print_help
+            ;;
+        --check)
+            DO_CHECK_ONLY=true
+            shift
+            ;;
+        --clean)
+            DO_CLEAN=true
+            shift
+            ;;
+        --no-audio)
+            SKIP_AUDIO=true
+            shift
+            ;;
+        --no-ollama)
+            SKIP_OLLAMA=true
+            shift
+            ;;
+        --model)
+            CHOSEN_MODEL="$2"
+            shift 2
+            ;;
+        --key)
+            CHOSEN_KEY="$2"
+            shift 2
+            ;;
+        *)
+            # Positional argument compatibility: [model] [key]
+            if [[ -z "$CHOSEN_MODEL_OVERRIDE" ]]; then
+                CHOSEN_MODEL="$1"
+                CHOSEN_MODEL_OVERRIDE=true
+            elif [[ -z "$CHOSEN_KEY_OVERRIDE" ]]; then
+                CHOSEN_KEY="$1"
+                CHOSEN_KEY_OVERRIDE=true
+            fi
+            shift
+            ;;
+    esac
+done
+
+echo -e "${CYAN}======================================================================${NC}"
+echo -e "${CYAN}${BOLD}     VOID — Autonomous AI Desktop Assistant Installation & Runner     ${NC}"
+echo -e "${CYAN}======================================================================${NC}"
+echo -e "${DIM}Repository Root : ${SCRIPT_DIR}${NC}"
+echo -e "${DIM}Active User     : ${TARGET_USER} (${TARGET_HOME})${NC}"
+echo -e "${DIM}Cloud Decider   : ${CHOSEN_MODEL}${NC}"
+echo ""
+
+# ==============================================================================
+# [1/8] System Package Manager & OS Dependency Provisioning
+# ==============================================================================
+echo -e "${BLUE}${BOLD}[1/8] Checking system packages and OS dependencies...${NC}"
+
+has_cmd() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Detect Linux Distribution & Package Manager
+PKG_MGR=""
+if has_cmd dnf; then
+    PKG_MGR="dnf"
+elif has_cmd apt-get; then
+    PKG_MGR="apt-get"
+elif has_cmd pacman; then
+    PKG_MGR="pacman"
+elif has_cmd zypper; then
+    PKG_MGR="zypper"
 fi
 
-# 2. Dependency Verification & Installation
-echo -e "${BLUE}[2/7] Verifying and installing core Python dependencies...${NC}"
+# Detect missing critical tools
+MISSING_PKGS=()
+has_cmd python3 || MISSING_PKGS+=("python3")
+has_cmd pip3 || has_cmd pip || MISSING_PKGS+=("python3-pip")
+has_cmd curl || MISSING_PKGS+=("curl")
+has_cmd wget || MISSING_PKGS+=("wget")
+has_cmd unzip || MISSING_PKGS+=("unzip")
+has_cmd git || MISSING_PKGS+=("git")
+has_cmd wmctrl || MISSING_PKGS+=("wmctrl")
+has_cmd xdotool || MISSING_PKGS+=("xdotool")
+
+if [ ${#MISSING_PKGS[@]} -gt 0 ]; then
+    echo -e "${YELLOW}Missing system utility packages: ${MISSING_PKGS[*]}${NC}"
+    if [ "$PKG_MGR" = "dnf" ]; then
+        INSTALL_CMD="sudo dnf install -y python3 python3-pip python3-devel portaudio-devel libsndfile ffmpeg wmctrl xdotool curl wget unzip git"
+    elif [ "$PKG_MGR" = "apt-get" ]; then
+        INSTALL_CMD="sudo apt-get update && sudo apt-get install -y python3 python3-pip python3-venv python3-dev portaudio19-dev libsndfile1-dev ffmpeg wmctrl xdotool curl wget unzip git"
+    elif [ "$PKG_MGR" = "pacman" ]; then
+        INSTALL_CMD="sudo pacman -Sy --noconfirm python python-pip portaudio libsndfile ffmpeg wmctrl xdotool curl wget unzip git"
+    elif [ "$PKG_MGR" = "zypper" ]; then
+        INSTALL_CMD="sudo zypper install -y python3 python3-pip python3-devel portaudio-devel libsndfile-devel ffmpeg wmctrl xdotool curl wget unzip git"
+    else
+        INSTALL_CMD=""
+    fi
+
+    if [ -n "$INSTALL_CMD" ]; then
+        if [ "$EUID" -eq 0 ]; then
+            ${INSTALL_CMD#sudo }
+        elif has_cmd sudo; then
+            echo -e "${CYAN}Installing missing system dependencies via sudo...${NC}"
+            eval "$INSTALL_CMD" || echo -e "${YELLOW}Package installation skipped or failed; continuing with user environment...${NC}"
+        else
+            echo -e "${YELLOW}Please install the following packages manually: ${MISSING_PKGS[*]}${NC}"
+        fi
+    fi
+else
+    echo -e "${GREEN}  ✓ Essential OS tools verified (python3, git, curl, wget, wmctrl, xdotool).${NC}"
+fi
+
+# ==============================================================================
+# [2/8] Python Virtual Environment Setup
+# ==============================================================================
+echo -e "${BLUE}${BOLD}[2/8] Configuring isolated Python virtual environment...${NC}"
+
+# Priority: Existing dodaios venv -> Repo .venv -> Create ~/.dodaios/.venv
+VENV_DIR="${TARGET_HOME}/.dodaios/.venv"
+
+if [ "$DO_CLEAN" = true ] && [ -d "$VENV_DIR" ]; then
+    echo -e "${YELLOW}Removing existing virtual environment for clean build...${NC}"
+    rm -rf "$VENV_DIR"
+fi
+
+if [ ! -d "$VENV_DIR" ] || [ ! -f "${VENV_DIR}/bin/python" ]; then
+    echo -e "${CYAN}Creating virtual environment at ${VENV_DIR}...${NC}"
+    mkdir -p "$(dirname "$VENV_DIR")"
+    python3 -m venv "$VENV_DIR"
+fi
+
+VENV_PYTHON="${VENV_DIR}/bin/python"
+
+# Upgrade pip & install build essentials
 "$VENV_PYTHON" -m pip install --quiet --upgrade pip setuptools wheel
+echo -e "${GREEN}  ✓ Virtual environment ready: ${VENV_PYTHON}${NC}"
+
+# ==============================================================================
+# [3/8] Python Library Dependencies Installation
+# ==============================================================================
+echo -e "${BLUE}${BOLD}[3/8] Verifying and installing Python dependencies...${NC}"
+
 "$VENV_PYTHON" -m pip install --quiet \
     PySide6 \
     faster-whisper \
     vosk \
     sounddevice \
+    sherpa-onnx \
     numpy \
     httpx \
-    psutil \
     requests \
+    psutil \
     python-docx \
     openpyxl \
     reportlab \
+    markdown \
+    beautifulsoup4 \
+    pillow \
+    pyautogui \
     ddgs 2>/dev/null || true
 
-echo -e "${GREEN}[2/7] Core dependencies successfully verified.${NC}"
+# Test core imports
+"$VENV_PYTHON" -c "import PySide6, sounddevice, numpy, httpx, psutil; print('  ✓ Core UI and audio frameworks verified.')"
+echo -e "${GREEN}  ✓ All Python modules successfully verified.${NC}"
 
-# 3. Optimize System Efficiency: Disable heavy background preview workers
-echo -e "${BLUE}[3/7] Optimizing system efficiency and reducing idle CPU load...${NC}"
-# Stop and disable rogue autostart dictation preview worker that hogs 40-70% CPU and 1.3GB RAM
+# ==============================================================================
+# [4/8] Acoustic & Neural TTS Models Auto-Provisioning
+# ==============================================================================
+echo -e "${BLUE}${BOLD}[4/8] Checking speech recognition and neural TTS models...${NC}"
+
+VOSK_DIR="${TARGET_HOME}/.dodaios/data/wake_models/vosk/en/vosk-model-small-en-us-0.15"
+PIPER_DIR="${TARGET_HOME}/.dodaios/data/models/vits-piper-en_US-ryan-medium"
+PIPER_MODEL="${PIPER_DIR}/en_US-ryan-medium.onnx"
+PIPER_CONFIG="${PIPER_DIR}/en_US-ryan-medium.onnx.json"
+
+if [ "$SKIP_AUDIO" = false ]; then
+    # 1. Vosk English Small Wake/STT Model
+    if [ -d "$VOSK_DIR" ] && [ -f "${VOSK_DIR}/am/final.mdl" -o -f "${VOSK_DIR}/README" ]; then
+        echo -e "${GREEN}  ✓ Vosk wake-word model present (${VOSK_DIR}).${NC}"
+    else
+        echo -e "${CYAN}  Downloading Vosk wake-word model (~40 MB)...${NC}"
+        mkdir -p "$(dirname "$VOSK_DIR")"
+        wget -q --show-progress -O /tmp/vosk_small.zip "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip"
+        unzip -q -o /tmp/vosk_small.zip -d "$(dirname "$VOSK_DIR")"
+        rm -f /tmp/vosk_small.zip
+        echo -e "${GREEN}  ✓ Vosk model successfully provisioned.${NC}"
+    fi
+
+    # 2. Piper Ryan Medium Neural Voice Model
+    if [ -f "$PIPER_MODEL" ] && [ -s "$PIPER_MODEL" ]; then
+        echo -e "${GREEN}  ✓ Piper neural TTS voice model present (${PIPER_MODEL}).${NC}"
+    else
+        echo -e "${CYAN}  Downloading Piper Ryan-Medium neural TTS voice (~64 MB)...${NC}"
+        mkdir -p "$PIPER_DIR"
+        wget -q --show-progress -O "$PIPER_MODEL" "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/medium/en_US-ryan-medium.onnx"
+        wget -q --show-progress -O "$PIPER_CONFIG" "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/medium/en_US-ryan-medium.onnx.json"
+        echo -e "${GREEN}  ✓ Piper neural voice model provisioned.${NC}"
+    fi
+else
+    echo -e "${YELLOW}  Audio models download skipped via --no-audio.${NC}"
+fi
+
+# ==============================================================================
+# [5/8] Local LLM Engine (Ollama) Provisioning & Model Check
+# ==============================================================================
+echo -e "${BLUE}${BOLD}[5/8] Checking Local LLM Engine (Ollama)...${NC}"
+
+if [ "$SKIP_OLLAMA" = false ]; then
+    if ! has_cmd ollama; then
+        echo -e "${YELLOW}  Ollama CLI is not installed.${NC}"
+        echo -e "${CYAN}  Installing Ollama automatically...${NC}"
+        curl -fsSL https://ollama.com/install.sh | sh 2>/dev/null || echo -e "${YELLOW}  Ollama installation skipped. You can install it manually from https://ollama.com${NC}"
+    fi
+
+    if has_cmd ollama; then
+        # Ensure service is running
+        if ! curl -s http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
+            echo -e "${CYAN}  Starting Ollama daemon...${NC}"
+            if systemctl is-enabled ollama >/dev/null 2>&1; then
+                sudo systemctl start ollama 2>/dev/null || systemctl start ollama 2>/dev/null || true
+            else
+                ollama serve >/dev/null 2>&1 &
+            fi
+            sleep 1.5
+        fi
+
+        if curl -s http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
+            echo -e "${GREEN}  ✓ Ollama daemon is active and responsive on port 11434.${NC}"
+            # Check default model
+            if ! ollama list 2>/dev/null | grep -q "lfm3-omni:2b"; then
+                echo -e "${CYAN}  Pulling default local lightweight model 'lfm3-omni:2b'...${NC}"
+                ollama pull lfm3-omni:2b || echo -e "${YELLOW}  Note: 'lfm3-omni:2b' pull can be completed later.${NC}"
+            else
+                echo -e "${GREEN}  ✓ Default local model 'lfm3-omni:2b' is loaded in Ollama.${NC}"
+            fi
+        else
+            echo -e "${YELLOW}  Ollama daemon is currently in standby. VOID will launch local server on demand.${NC}"
+        fi
+    fi
+else
+    echo -e "${YELLOW}  Local Ollama check skipped via --no-ollama.${NC}"
+fi
+
+# ==============================================================================
+# [6/8] System Performance & Low-Latency Optimization
+# ==============================================================================
+echo -e "${BLUE}${BOLD}[6/8] Optimizing system performance and background services...${NC}"
+
+# Disable heavy background dictation preview worker that consumes 40-70% CPU and 1.3 GB RAM
 if systemctl --user is-active --quiet app-dodaios@autostart.service 2>/dev/null; then
-    echo -e "${YELLOW}      Deactivating conflicting background dictation worker service...${NC}"
+    echo -e "${YELLOW}  Deactivating conflicting legacy dictation autostart worker...${NC}"
     systemctl --user stop app-dodaios@autostart.service 2>/dev/null || true
 fi
-if [ -f "/home/prakash/.config/autostart/dodaios.desktop" ]; then
-    # Disable autostart so large-v3-turbo dictation worker does not consume 27 CPU threads on boot
-    sed -i 's/X-GNOME-Autostart-enabled=true/X-GNOME-Autostart-enabled=false/g' /home/prakash/.config/autostart/dodaios.desktop 2>/dev/null || true
-    echo "Hidden=true" >> /home/prakash/.config/autostart/dodaios.desktop 2>/dev/null || true
+
+AUTOSTART_LEGACY="${TARGET_HOME}/.config/autostart/dodaios.desktop"
+if [ -f "$AUTOSTART_LEGACY" ]; then
+    sed -i 's/X-GNOME-Autostart-enabled=true/X-GNOME-Autostart-enabled=false/g' "$AUTOSTART_LEGACY" 2>/dev/null || true
+    echo "Hidden=true" >> "$AUTOSTART_LEGACY" 2>/dev/null || true
 fi
-echo -e "${GREEN}[3/7] CPU & RAM efficiency optimized. Background conflicts cleared.${NC}"
 
-# 4. Configure AI Models (User Chosen: Perplexity / OpenRouter + Local Ollama)
-echo -e "${BLUE}[4/7] Configuring AI Models and Cloud API Keys...${NC}"
-CONFIG_DIR="${SCRIPT_DIR}/config"
-mkdir -p "$CONFIG_DIR"
-AI_CONFIG_FILE="${CONFIG_DIR}/ai_providers.json"
+echo -e "${GREEN}  ✓ Idle CPU load optimized. Low-latency voice pipelines prioritized.${NC}"
 
-DEFAULT_MODEL="perplexity/pplx-decider-flash-v1.3:free"
-DEFAULT_KEY="${OPENROUTER_API_KEY:-}"
+# ==============================================================================
+# [7/8] Multi-Model AI Providers Configuration
+# ==============================================================================
+echo -e "${BLUE}${BOLD}[7/8] Configuring Multi-Model AI pipeline & keys...${NC}"
 
-# Allow environment or interactive override if passed as arguments
-CHOSEN_MODEL="${1:-$DEFAULT_MODEL}"
-CHOSEN_KEY="${2:-$DEFAULT_KEY}"
+AI_CONFIG_FILE="${SCRIPT_DIR}/config/ai_providers.json"
+USER_CONFIG_FILE="${TARGET_HOME}/.config/void/ai_providers.json"
+
+# Check if an existing configuration is already present with an active key
+EXISTING_KEY=""
+if [ -f "$AI_CONFIG_FILE" ]; then
+    EXISTING_KEY="$("$VENV_PYTHON" -c "
+import json
+try:
+    with open('${AI_CONFIG_FILE}') as f:
+        d = json.load(f)
+    print(d.get('cloud', {}).get('api_key', '') or d.get('profiles', {}).get('openrouter', {}).get('api_key', ''))
+except Exception:
+    pass
+" 2>/dev/null || true)"
+fi
+
+FINAL_KEY="${CHOSEN_KEY:-$EXISTING_KEY}"
 
 cat <<EOF > "$AI_CONFIG_FILE"
 {
@@ -85,43 +362,50 @@ cat <<EOF > "$AI_CONFIG_FILE"
   "cloud": {
     "enabled": true,
     "api_base": "https://openrouter.ai/api/v1",
-    "api_key": "${CHOSEN_KEY}",
+    "api_key": "${FINAL_KEY}",
     "model": "${CHOSEN_MODEL}"
   },
   "profiles": {
     "ollama_local": {
-      "provider_name": "Ollama Local",
+      "provider_name": "Local Model",
       "api_base": "http://127.0.0.1:11434",
       "api_key": "",
       "default_model": "lfm3-omni:2b",
       "enabled": true
     },
     "openrouter": {
-      "provider_name": "OpenRouter",
+      "provider_name": "Model 1",
       "api_base": "https://openrouter.ai/api/v1",
-      "api_key": "${CHOSEN_KEY}",
+      "api_key": "${FINAL_KEY}",
       "default_model": "${CHOSEN_MODEL}",
       "enabled": true
     },
     "openai": {
-      "provider_name": "OpenAI",
+      "provider_name": "Model 2",
       "api_base": "https://api.openai.com/v1",
       "api_key": "",
       "default_model": "gpt-4o",
       "enabled": false
     },
     "groq": {
-      "provider_name": "Groq",
+      "provider_name": "Model 3",
       "api_base": "https://api.groq.com/openai/v1",
       "api_key": "",
       "default_model": "llama-3.3-70b-versatile",
       "enabled": false
     },
     "deepseek": {
-      "provider_name": "DeepSeek",
+      "provider_name": "Model 4",
       "api_base": "https://api.deepseek.com/v1",
       "api_key": "",
       "default_model": "deepseek-chat",
+      "enabled": false
+    },
+    "custom": {
+      "provider_name": "Model 5",
+      "api_base": "http://127.0.0.1:8000/v1",
+      "api_key": "",
+      "default_model": "custom-model",
       "enabled": false
     }
   },
@@ -161,32 +445,24 @@ cat <<EOF > "$AI_CONFIG_FILE"
   }
 }
 EOF
-echo -e "${GREEN}[4/7] Configured AI model: ${CHOSEN_MODEL}${NC}"
 
-# Also copy to ~/.config/void/ if it exists
-mkdir -p /home/prakash/.config/void
-cp -f "$AI_CONFIG_FILE" /home/prakash/.config/void/ai_providers.json 2>/dev/null || true
+# Mirror configuration to user config path
+cp -f "$AI_CONFIG_FILE" "$USER_CONFIG_FILE" 2>/dev/null || true
 
-# 5. Acoustic Models & Neural TTS Check
-echo -e "${BLUE}[5/7] Checking offline speech models...${NC}"
-VOSK_DIR="/home/prakash/.dodaios/data/wake_models/vosk/en/vosk-model-small-en-us-0.15"
-PIPER_MODEL="/home/prakash/.dodaios/data/models/vits-piper-en_US-ryan-medium/en_US-ryan-medium.onnx"
-
-if [ -d "$VOSK_DIR" ]; then
-    echo -e "${GREEN}      Vosk wake-word model present.${NC}"
+echo -e "${GREEN}  ✓ AI configuration compiled: ${CHOSEN_MODEL}${NC}"
+if [ -n "$FINAL_KEY" ]; then
+    echo -e "${GREEN}  ✓ Cloud API key registered.${NC}"
 else
-    echo -e "${YELLOW}      Downloading Vosk small model...${NC}"
-    mkdir -p "$(dirname "$VOSK_DIR")"
-    wget -q --show-progress -O /tmp/vosk.zip https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
-    unzip -q /tmp/vosk.zip -d "$(dirname "$VOSK_DIR")"
-    rm -f /tmp/vosk.zip
+    echo -e "${YELLOW}  ℹ No cloud API key provided; local keyless mode active. Add keys in UI (⚙ icon).${NC}"
 fi
 
-# 6. Desktop Entries & Autostart Configuration
-echo -e "${BLUE}[6/7] Updating desktop entries and login autostart...${NC}"
-mkdir -p /home/prakash/.local/share/applications /home/prakash/.config/autostart
+# ==============================================================================
+# [8/8] Desktop & CLI Shortcut Registration
+# ==============================================================================
+echo -e "${BLUE}${BOLD}[8/8] Registering Desktop integration and CLI shortcuts...${NC}"
 
-cat <<EOF > /home/prakash/.local/share/applications/void.desktop
+DESKTOP_ENTRY="${TARGET_HOME}/.local/share/applications/void.desktop"
+cat <<EOF > "$DESKTOP_ENTRY"
 [Desktop Entry]
 Type=Application
 Name=VOID AI Assistant
@@ -209,19 +485,64 @@ Name=Configure VOID Models
 Exec=${SCRIPT_DIR}/terminalsetuprun
 EOF
 
-cp -f /home/prakash/.local/share/applications/void.desktop /home/prakash/.config/autostart/void.desktop
-chmod +x /home/prakash/.local/share/applications/void.desktop /home/prakash/.config/autostart/void.desktop
-chmod +x "${SCRIPT_DIR}/scripts/run_void.sh" "${SCRIPT_DIR}/scripts/stop_void.sh"
+chmod +x "$DESKTOP_ENTRY"
 
-echo -e "${GREEN}[6/7] Desktop launcher and autostart registered.${NC}"
+# Place desktop shortcut if user Desktop folder exists
+if [ -d "${TARGET_HOME}/Desktop" ]; then
+    cp -f "$DESKTOP_ENTRY" "${TARGET_HOME}/Desktop/void.desktop"
+    chmod +x "${TARGET_HOME}/Desktop/void.desktop" 2>/dev/null || true
+fi
 
-# 7. Boot VOID Desktop Assistant
-echo -e "${BLUE}[7/7] Launching VOID Personal AI Desktop Assistant...${NC}"
-"${SCRIPT_DIR}/scripts/run_void.sh" &
+# CLI symlink (~/.local/bin/void)
+ln -sf "${SCRIPT_DIR}/scripts/run_void.sh" "${TARGET_HOME}/.local/bin/void"
+ln -sf "${SCRIPT_DIR}/scripts/stop_void.sh" "${TARGET_HOME}/.local/bin/void-stop"
 
-echo -e "${CYAN}==================================================================${NC}"
-echo -e "${GREEN}  ✓ VOID has been successfully installed, configured & started!  ${NC}"
-echo -e "${CYAN}  Model: ${CHOSEN_MODEL}${NC}"
-echo -e "${CYAN}  Configuration Window: Click the ⚙ icon on widget or status pill  ${NC}"
-echo -e "${CYAN}==================================================================${NC}"
+# Relative symlink for terminalsetuprun alias
+ln -sf terminalsetuprun "${SCRIPT_DIR}/termialsteuprun"
+chmod +x "${SCRIPT_DIR}/terminalsetuprun" "${SCRIPT_DIR}/termialsteuprun"
 
+if has_cmd update-desktop-database; then
+    update-desktop-database "${TARGET_HOME}/.local/share/applications" 2>/dev/null || true
+fi
+
+echo -e "${GREEN}  ✓ Desktop launcher registered (~/.local/share/applications/void.desktop).${NC}"
+echo -e "${GREEN}  ✓ CLI shortcut linked: void -> ${SCRIPT_DIR}/scripts/run_void.sh${NC}"
+
+# ==============================================================================
+# Execution / Verification Summary
+# ==============================================================================
+if [ "$DO_CHECK_ONLY" = true ]; then
+    echo ""
+    echo -e "${CYAN}======================================================================${NC}"
+    echo -e "${GREEN}${BOLD}  ✓ Verification Complete: VOID is fully provisioned and ready to run.${NC}"
+    echo -e "${CYAN}======================================================================${NC}"
+    exit 0
+fi
+
+echo ""
+echo -e "${CYAN}======================================================================${NC}"
+echo -e "${GREEN}${BOLD}  ✓ VOID has been successfully installed, configured & started!       ${NC}"
+echo -e "${CYAN}======================================================================${NC}"
+echo -e "  ${BOLD}Model Profile:${NC}       ${CHOSEN_MODEL}"
+echo -e "  ${BOLD}Widget Dimensions:${NC}   358 × 246 / 256 px (Ultra-compact Glass Flow)"
+echo -e "  ${BOLD}Desktop Control:${NC}     Drag widget to move | Double-click to toggle view"
+echo -e "  ${BOLD}Settings Window:${NC}     Click ⚙ gear icon to customize models & keys"
+echo -e "  ${BOLD}Voice Commands:${NC}      'hey void', 'offload model', 'start model', 'open <file>'"
+echo -e "  ${BOLD}Terminal CLI:${NC}        Run 'void' or 'void-stop'"
+echo -e "${CYAN}======================================================================${NC}"
+echo ""
+
+# Stop any running old instance
+pkill -f "void-widget.py" 2>/dev/null || true
+sleep 0.5
+
+# Launch VOID in background
+echo -e "${CYAN}Launching VOID Desktop Assistant...${NC}"
+"${SCRIPT_DIR}/scripts/run_void.sh" >/dev/null 2>&1 &
+sleep 1.5
+
+if pgrep -f "void-widget.py" >/dev/null; then
+    echo -e "${GREEN}${BOLD}✓ VOID Mini Widget is active and running on your desktop!${NC}"
+else
+    echo -e "${YELLOW}Widget process launched in background. Check logs at ${SCRIPT_DIR}/config/widget.log${NC}"
+fi

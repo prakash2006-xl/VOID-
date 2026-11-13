@@ -400,7 +400,7 @@ class PlannerAgent(BaseAgent):
             timeout_sec=10,
         )
 
-        report_path = f"/home/prakash/Documents/Reports/System_Performance_Audit_{plan_id}.docx"
+        report_path = f"{str(Path.home())}/Documents/Reports/System_Performance_Audit_{plan_id}.docx"
         t4 = AgentTask(
             task_id=t4_id,
             assigned_agent=AgentRole.RESEARCH_PRODUCTIVITY,
@@ -435,7 +435,7 @@ class PlannerAgent(BaseAgent):
 
     def _plan_python_csv_project(self, plan_id: str, goal: str, context: Optional[Dict[str, Any]]) -> List[AgentTask]:
         """Plans a 5-step autonomous Python CSV data analysis project with scaffolding, tests, and reporting."""
-        project_dir = "/home/prakash/Documents/Projects/data_analysis"
+        project_dir = "{str(Path.home())}/Documents/Projects/data_analysis"
         csv_path = f"{project_dir}/dataset.csv"
         script_path = f"{project_dir}/analyzer.py"
         test_path = f"{project_dir}/test_analyzer.py"
@@ -558,7 +558,7 @@ class PlannerAgent(BaseAgent):
             timeout_sec=15,
         )
 
-        docx_path = f"/home/prakash/Documents/Reports/Local_LLM_Comparison_{plan_id}.docx"
+        docx_path = f"{str(Path.home())}/Documents/Reports/Local_LLM_Comparison_{plan_id}.docx"
         t3 = AgentTask(
             task_id=t3_id,
             assigned_agent=AgentRole.RESEARCH_PRODUCTIVITY,
@@ -593,9 +593,9 @@ class PlannerAgent(BaseAgent):
 
     def _plan_productivity_workflow(self, plan_id: str, goal: str, context: Optional[Dict[str, Any]]) -> List[AgentTask]:
         """Plans a 4-step multi-agent workflow converting unstructured notes into DOCX summary and XLSX tracker."""
-        notes_dir = "/home/prakash/Documents/Notes"
-        docx_path = f"/home/prakash/Documents/Reports/Notes_Compilation_{plan_id}.docx"
-        xlsx_path = f"/home/prakash/Documents/Reports/Action_Items_{plan_id}.xlsx"
+        notes_dir = "{str(Path.home())}/Documents/Notes"
+        docx_path = f"{str(Path.home())}/Documents/Reports/Notes_Compilation_{plan_id}.docx"
+        xlsx_path = f"{str(Path.home())}/Documents/Reports/Action_Items_{plan_id}.xlsx"
 
         t1_id = f"{plan_id}_t1_inspect_notes"
         t2_id = f"{plan_id}_t2_extract_compile"
@@ -650,7 +650,7 @@ class PlannerAgent(BaseAgent):
     def _plan_void_project_analysis(self, plan_id: str, goal: str) -> List[AgentTask]:
         """Plans a 5-step comprehensive multi-agent project analysis and development improvement workflow."""
         import sys
-        project_dir = "/run/media/prakash/TR_39/VOID"
+        project_dir = "{str(Path(__file__).resolve().parent.parent)}"
         t1_id = f"{plan_id}_t1_inspect_project"
         t2_id = f"{plan_id}_t2_code_diagnostics"
         t3_id = f"{plan_id}_t3_run_verification_tests"
@@ -689,7 +689,7 @@ class PlannerAgent(BaseAgent):
             timeout_sec=20,
         )
 
-        report_path = f"/home/prakash/Documents/Reports/VOID_Development_Improvement_Report_{plan_id}.docx"
+        report_path = f"{str(Path.home())}/Documents/Reports/VOID_Development_Improvement_Report_{plan_id}.docx"
         t4 = AgentTask(
             task_id=t4_id,
             assigned_agent=AgentRole.RESEARCH_PRODUCTIVITY,

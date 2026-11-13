@@ -1081,10 +1081,11 @@ def _populate_default_tools(reg: ToolRegistry, perm_mgr: PermissionManager, tool
         permission_level=PermissionLevel.LEVEL_1_READONLY
     )
 
-    def _analyze_codebase_diagnostics(project_path: str = "/run/media/prakash/TR_39/VOID", **kwargs) -> dict[str, Any]:
+    def _analyze_codebase_diagnostics(project_path: str = "", **kwargs) -> dict[str, Any]:
         """Inspects source files, parses AST syntax, checks for syntax errors, and compiles diagnostic metrics."""
         import ast
-        root = Path(os.path.expanduser(project_path)).resolve()
+        p_target = project_path if project_path else str(Path(__file__).resolve().parent.parent)
+        root = Path(os.path.expanduser(p_target)).resolve()
         if not root.exists():
             return {"success": False, "error": f"Path not found: {project_path}"}
 
@@ -1126,7 +1127,7 @@ def _populate_default_tools(reg: ToolRegistry, perm_mgr: PermissionManager, tool
         handler=_analyze_codebase_diagnostics,
         parameters={
             "type": "object",
-            "properties": {"project_path": {"type": "string", "default": "/run/media/prakash/TR_39/VOID"}}
+            "properties": {"project_path": {"type": "string", "default": ""}}
         },
         permission_level=PermissionLevel.LEVEL_1_READONLY
     )

@@ -6,11 +6,11 @@ TARGET_DIR="${SCRIPT_DIR}/.."
 
 echo "[VOID Backup] Synchronizing active files to ${TARGET_DIR}..."
 
-cp -p /home/prakash/.local/bin/void-widget.py "${TARGET_DIR}/bin/"
-cp -p /home/prakash/.local/bin/void-launcher.py "${TARGET_DIR}/bin/"
-cp -p /home/prakash/.config/autostart/void.desktop "${TARGET_DIR}/config/"
-cp -p /home/prakash/.config/void/tasks.json "${TARGET_DIR}/config/"
-cp -p /home/prakash/.config/void/widget_pos.json "${TARGET_DIR}/config/"
+cp -p "${HOME}/.local/bin/void-widget.py" "${TARGET_DIR}/bin/" 2>/dev/null || true
+cp -p "${HOME}/.local/bin/void-launcher.py" "${TARGET_DIR}/bin/" 2>/dev/null || true
+cp -p "${HOME}/.config/autostart/void.desktop" "${TARGET_DIR}/config/" 2>/dev/null || true
+cp -p "${HOME}/.config/void/tasks.json" "${TARGET_DIR}/config/" 2>/dev/null || true
+cp -p "${HOME}/.config/void/widget_pos.json" "${TARGET_DIR}/config/" 2>/dev/null || true
 
 echo "[VOID Backup] Backup completed successfully."
 

@@ -6,13 +6,14 @@ Welcome to the setup documentation for **VOID**, an autonomous, personal AI desk
 
 ## Quick Start (One-Click Automated Setup)
 
-You can install all requirements, configure chosen models, optimize CPU/RAM efficiency, and launch VOID with a single command or click:
+You can install all requirements, configure chosen models, optimize CPU/RAM efficiency, and launch VOID with a single command on any Linux system:
 
 ```bash
-cd /run/media/prakash/TR_39/VOID
+git clone https://github.com/prakash2006-xl/VOID-.git
+cd VOID-
 ./terminalsetuprun
 ```
-*(You can also double-click `terminalsetuprun` or `termialsteuprun` in Dolphin).*
+*(You can also double-click `terminalsetuprun` or `termialsteuprun` in Dolphin / File Manager).*
 
 ---
 
@@ -80,17 +81,21 @@ All persistent runtime assets, scripts, neural models, and memory databases resi
 
 ## 3. One-Click Setup Script (`terminalsetuprun`)
 
-The `terminalsetuprun` executable automates the entire end-to-end setup:
+The `terminalsetuprun` executable automates the entire end-to-end setup across Fedora, Debian, Ubuntu, Arch Linux, and openSUSE:
 
-1. **Virtual Environment:** Validates `/home/prakash/.dodaios/.venv` and installs required packages (`PySide6`, `faster-whisper`, `vosk`, `sounddevice`, `httpx`, `reportlab`, `python-docx`, `openpyxl`, `ddgs`).
-2. **Efficiency Guard:** Automatically deactivates rogue background dictation workers (`preview_worker large-v3-turbo`) that waste 40-70% CPU and 1.3GB RAM.
-3. **Model Configuration:** Automatically writes chosen models (e.g., OpenRouter `perplexity/pplx-decider-flash-v1.3:free`) and API key into `config/ai_providers.json`.
-4. **Speech Assets:** Checks and downloads Vosk Kaldi acoustic wake-word models and Piper neural TTS voice models if missing.
-5. **Autostart & Launch:** Configures `~/.config/autostart/void.desktop` and launches the VOID widget.
+1. **System Packages:** Detects distribution package manager (`dnf`, `apt`, `pacman`, `zypper`) and provisions essential dependencies (`python3`, `portaudio`, `libsndfile`, `ffmpeg`, `wmctrl`, `xdotool`, `git`, `curl`, `wget`, `unzip`).
+2. **Virtual Environment:** Automatically provisions an isolated virtual environment (`~/.dodaios/.venv` or local `.venv`) and installs all required Python packages (`PySide6`, `faster-whisper`, `vosk`, `sounddevice`, `httpx`, `reportlab`, `python-docx`, `openpyxl`, `ddgs`, `sherpa-onnx`).
+3. **Efficiency Guard:** Automatically deactivates rogue background dictation workers (`preview_worker large-v3-turbo`) that waste 40-70% CPU and 1.3GB RAM.
+4. **Speech Assets:** Checks and downloads Vosk Kaldi acoustic wake-word models and Piper neural TTS voice models from official repositories if missing.
+5. **Local LLM Daemon:** Inspects and initializes Ollama, pulling the default local model `lfm3-omni:2b`.
+6. **Model Configuration:** Automatically writes chosen models (e.g., OpenRouter `perplexity/pplx-decider-flash-v1.3:free`) and API key into `config/ai_providers.json`.
+7. **Autostart & Launch:** Registers `~/.local/share/applications/void.desktop`, creates CLI shortcut `void` in `~/.local/bin/void`, and launches the VOID widget.
 
 ### Running with Custom Model Arguments:
 ```bash
-./terminalsetuprun "perplexity/pplx-decider-flash-v1.3:free" "sk-or-v1-YOUR_KEY_HERE"
+./terminalsetuprun --model "perplexity/pplx-decider-flash-v1.3:free" --key "sk-or-v1-YOUR_KEY_HERE"
+# Or dry-run check:
+./terminalsetuprun --check
 ```
 
 ---

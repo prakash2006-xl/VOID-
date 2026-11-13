@@ -18,8 +18,8 @@ APPROVED_WORKSPACES = [
     Path(os.path.expanduser("~/Documents/Reports")),
     Path(os.path.expanduser("~/Documents/Notes")),
     Path(os.path.expanduser("~/Documents/Projects")),
-    Path("/run/media/prakash/TR_39/VOID/memory"),
-    Path("/run/media/prakash/TR_39/VOID/logs"),
+    (Path(__file__).resolve().parent.parent / "memory"),
+    (Path(__file__).resolve().parent.parent / "logs"),
     Path("/tmp/void_sandbox"),
 ]
 

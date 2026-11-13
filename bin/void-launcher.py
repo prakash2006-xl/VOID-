@@ -9,25 +9,37 @@ import os
 import time
 import json
 import signal
+import shutil
 import urllib.request
 import urllib.error
 import subprocess
 from pathlib import Path
 
-DATA_DIR = Path("/home/prakash/.dodaios/data")
-SSD_VOID_DIR = Path("/run/media/prakash/TR_39/VOID")
-CONFIG_DIR = SSD_VOID_DIR / "config" if SSD_VOID_DIR.exists() else Path("/home/prakash/.config/void")
+HOME_DIR = Path.home()
+SSD_VOID_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = HOME_DIR / ".dodaios/data"
+CONFIG_DIR = SSD_VOID_DIR / "config" if (SSD_VOID_DIR / "config").exists() else HOME_DIR / ".config/void"
 CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 PID_FILE = CONFIG_DIR / ".void_launcher.json"
-OLLAMA_MODELS_DIR = SSD_VOID_DIR / "models"
-os.environ["OLLAMA_MODELS"] = str(OLLAMA_MODELS_DIR)
+OLLAMA_MODELS_DIR = SSD_VOID_DIR / "models" if (SSD_VOID_DIR / "models").exists() else HOME_DIR / ".ollama/models"
+if OLLAMA_MODELS_DIR.exists():
+    os.environ["OLLAMA_MODELS"] = str(OLLAMA_MODELS_DIR)
 
 OLLAMA_ENDPOINT = "http://127.0.0.1:11434/api/tags"
 DODAIOS_HEALTH = "http://127.0.0.1:47821/api/health"
 DODAIOS_APP_URL = "http://127.0.0.1:47821/"
-VENV_PYTHON = "/home/prakash/.dodaios/.venv/bin/python"
-DODAIOS_BIN = "/home/prakash/.dodaios/.venv/bin/dodaios"
-CHROMIUM_BIN = "/usr/bin/chromium-browser"
+
+# Locate Python binary dynamically
+candidate_pythons = [
+    sys.executable,
+    str(SSD_VOID_DIR / ".venv/bin/python"),
+    str(HOME_DIR / ".dodaios/.venv/bin/python"),
+    str(HOME_DIR / ".void/.venv/bin/python"),
+    shutil.which("python3") or "python3"
+]
+VENV_PYTHON = next((p for p in candidate_pythons if p and Path(p).is_file() and os.access(p, os.X_OK)), sys.executable)
+DODAIOS_BIN = str(Path(VENV_PYTHON).parent / "dodaios")
+CHROMIUM_BIN = shutil.which("chromium") or shutil.which("chromium-browser") or shutil.which("google-chrome") or "/usr/bin/chromium-browser"
 
 def is_url_alive(url, timeout=1.5):
     try:
@@ -136,7 +148,7 @@ def start_void():
         log_file = open(DATA_DIR / "dodaios.log", "a")
         dodai_proc = subprocess.Popen(
             [DODAIOS_BIN, "serve"],
-            cwd="/home/prakash/.dodaios",
+            cwd=str(HOME_DIR / ".dodaios") if (HOME_DIR / ".dodaios").exists() else str(SSD_VOID_DIR),
             stdout=log_file,
             stderr=subprocess.STDOUT,
             start_new_session=True

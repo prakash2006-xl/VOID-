@@ -73,16 +73,16 @@ except ImportError as e:
 # ---------------------------------------------------------------------------
 # Constants & Configuration
 # ---------------------------------------------------------------------------
-SSD_VOID_DIR = Path("/run/media/prakash/TR_39/VOID")
-CONFIG_DIR = SSD_VOID_DIR / "config" if SSD_VOID_DIR.exists() else Path("/home/prakash/.config/void")
+SSD_VOID_DIR = Path(__file__).resolve().parent.parent
+CONFIG_DIR = SSD_VOID_DIR / "config" if (SSD_VOID_DIR / "config").exists() else Path.home() / ".config/void"
 CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 POS_FILE = CONFIG_DIR / "widget_pos.json"
-MODELS_DIR = SSD_VOID_DIR / "models" if SSD_VOID_DIR.exists() else Path("/home/prakash/.ollama/models")
+MODELS_DIR = SSD_VOID_DIR / "models" if (SSD_VOID_DIR / "models").exists() else Path.home() / ".ollama/models"
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 os.environ["OLLAMA_MODELS"] = str(MODELS_DIR)
 CHROMIUM_BIN = "/usr/bin/chromium-browser"
 
-MEMORY_DIR = SSD_VOID_DIR / "memory" if SSD_VOID_DIR.exists() else CONFIG_DIR / "memory"
+MEMORY_DIR = SSD_VOID_DIR / "memory" if (SSD_VOID_DIR / "memory").exists() else CONFIG_DIR / "memory"
 MEMORY_DIR.mkdir(parents=True, exist_ok=True)
 MAX_MEMORY_BYTES = 1500 * 1024 * 1024  # 1.5 GB SSD Ring Buffer allocation
 PRUNE_TARGET_BYTES = 1200 * 1024 * 1024 # 1.2 GB LRU target
@@ -116,10 +116,10 @@ def get_last_created_file_metadata() -> str | None:
 OLLAMA_URL = "http://127.0.0.1:11434"
 DODAIOS_URL = "http://127.0.0.1:47821"
 
-VOSK_MODEL_PATH = "/home/prakash/.dodaios/data/wake_models/vosk/en/vosk-model-small-en-us-0.15"
+VOSK_MODEL_PATH = str(Path.home() / ".dodaios/data/wake_models/vosk/en/vosk-model-small-en-us-0.15")
 WHISPER_MODEL_NAME = "base"
-PIPER_MODEL_PATH = "/home/prakash/.dodaios/data/models/vits-piper-en_US-ryan-medium/en_US-ryan-medium.onnx"
-SCREENSHOT_DIR = Path("/home/prakash/Pictures/Screenshots")
+PIPER_MODEL_PATH = str(Path.home() / ".dodaios/data/models/vits-piper-en_US-ryan-medium/en_US-ryan-medium.onnx")
+SCREENSHOT_DIR = Path.home() / "Pictures/Screenshots"
 SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
 
 FORBIDDEN_PATHS = [
@@ -138,7 +138,7 @@ try:
 except ImportError:
     openpyxl = None
 
-DOCS_DIR = Path("/home/prakash/Documents")
+DOCS_DIR = Path.home() / "Documents"
 REPORTS_DIR = DOCS_DIR / "Reports"
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 NOTES_DIR = DOCS_DIR / "Notes"
@@ -700,7 +700,7 @@ TOOLS_SCHEMA = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Target file path (e.g. ~/Documents/notes.txt or /home/prakash/Documents/summary.md)"},
+                    "path": {"type": "string", "description": "Target file path (e.g. ~/Documents/notes.txt or ~/Documents/summary.md)"},
                     "content": {"type": "string", "description": "The text or markdown content to write"}
                 },
                 "required": ["path", "content"]
@@ -959,7 +959,7 @@ def run_terminal_command(cmd: str) -> tuple[int, str]:
     try:
         res = subprocess.run(
             cmd, shell=True, executable="/bin/bash",
-            capture_output=True, text=True, timeout=10.0, cwd="/home/prakash"
+            capture_output=True, text=True, timeout=10.0, cwd=str(Path.home())
         )
         out = (res.stdout + res.stderr).strip()
         return res.returncode, out or "(Command completed with no output)"
@@ -1038,7 +1038,7 @@ def kwin_manage_app_window(app_name: str, action: str) -> bool:
 def is_safe_user_path(p: str | Path) -> bool:
     try:
         resolved = Path(p).expanduser().resolve()
-        home = Path("/home/prakash").resolve()
+        home = Path.home().resolve()
         if not resolved.is_relative_to(home):
             return False
         for forbidden in FORBIDDEN_PATHS:
@@ -1069,7 +1069,7 @@ def get_system_health() -> dict[str, Any]:
         health["cpu_load_1m"] = 0.0
 
     try:
-        st = os.statvfs("/home/prakash")
+        st = os.statvfs(str(Path.home()))
         free_gb = (st.f_bavail * st.f_frsize) / (1024**3)
         total_gb = (st.f_blocks * st.f_frsize) / (1024**3)
         used_gb = total_gb - free_gb
@@ -2059,10 +2059,10 @@ class DodaiosToolHub:
             if not target_f or not Path(target_f).exists():
                 # Traceback search: find newest document generated across Documents, Reports, Notes, Desktop, Workspace
                 search_dirs = [
-                    Path("/home/prakash/Documents"),
-                    Path("/home/prakash/Documents/Reports"),
-                    Path("/home/prakash/Documents/Notes"),
-                    Path("/home/prakash/Desktop"),
+                    (Path.home() / "Documents"),
+                    (Path.home() / "Documents/Reports"),
+                    (Path.home() / "Documents/Notes"),
+                    (Path.home() / "Desktop"),
                     Path("/run/media/prakash/TR_39/VOID")
                 ]
                 recent_files = []
@@ -2811,7 +2811,7 @@ class DodaiosToolHub:
         title = base_title.replace("_", " ").title() if base_title else intel["title"]
         safe_name = "".join(c for c in base_title if c.isalnum() or c in "_- ").strip().replace(" ", "_") if base_title else "".join(c for c in title if c.isalnum() or c in "_- ").strip().replace(" ", "_") or "document"
 
-        DOCS_DIR = Path("/home/prakash/Documents")
+        DOCS_DIR = Path.home() / "Documents"
         REPORTS_DIR = DOCS_DIR / "Reports"
         DOCS_DIR.mkdir(parents=True, exist_ok=True)
         REPORTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -2837,7 +2837,7 @@ class DodaiosToolHub:
                 "timestamp": time.time(),
                 "target_pages": target_pages
             }
-            return True, f"Created PDF document '{out_file.name}' in /home/prakash/Documents/Reports. Say 'open it' or 'open {out_file.name}' to view it.", str(out_file)
+            return True, f"Created PDF document '{out_file.name}' in {out_file.parent}. Say 'open it' or 'open {out_file.name}' to view it.", str(out_file)
         elif ft in ["docx", "word", "doc", "dox"]:
             out_file = DOCS_DIR / f"{safe_name}.docx"
             msg = self.draft_docx_document(title, sections, filename=str(out_file))
@@ -2856,7 +2856,7 @@ class DodaiosToolHub:
                 "timestamp": time.time(),
                 "target_pages": target_pages
             }
-            return True, f"Created DOCX document '{out_file.name}' in /home/prakash/Documents. Say 'open it' or 'open {out_file.name}' to view it.", str(out_file)
+            return True, f"Created DOCX document '{out_file.name}' in {out_file.parent}. Say 'open it' or 'open {out_file.name}' to view it.", str(out_file)
         elif ft in ["txt", "text"]:
             out_file = DOCS_DIR / f"{safe_name}.txt"
             txt_lines = [
@@ -2898,7 +2898,7 @@ class DodaiosToolHub:
                 "timestamp": time.time(),
                 "target_pages": target_pages
             }
-            return True, f"Created text file '{out_file.name}' in /home/prakash/Documents. Say 'open it' or 'open {out_file.name}' to view it.", str(out_file)
+            return True, f"Created text file '{out_file.name}' in {out_file.parent}. Say 'open it' or 'open {out_file.name}' to view it.", str(out_file)
         else:
             out_file = DOCS_DIR / f"{safe_name}.md"
             md_text = f"# {title}\n\n" + "\n\n".join(f"## {s['heading']}\n\n{s['content']}" for s in sections)
@@ -2914,7 +2914,7 @@ class DodaiosToolHub:
                 "timestamp": time.time(),
                 "target_pages": target_pages
             }
-            return True, f"Created document '{out_file.name}' in /home/prakash/Documents. Say 'open it' or 'open {out_file.name}' to view it.", str(out_file)
+            return True, f"Created document '{out_file.name}' in {out_file.parent}. Say 'open it' or 'open {out_file.name}' to view it.", str(out_file)
 
     def rewrite_document_content(self, instructions: str, target_file: str = "") -> tuple[bool, str, str]:
         """Rewrites or modifies existing document content according to user directives."""
@@ -3258,10 +3258,10 @@ class DodaiosToolHub:
             return []
 
         search_dirs = [
-            Path("/home/prakash/Documents"),
-            Path("/home/prakash/Downloads"),
-            Path("/home/prakash/Pictures"),
-            Path("/home/prakash/Desktop"),
+            (Path.home() / "Documents"),
+            (Path.home() / "Downloads"),
+            (Path.home() / "Pictures"),
+            (Path.home() / "Desktop"),
             Path("/run/media/prakash/TR_39/VOID"),
         ]
         if search_path:
@@ -3306,7 +3306,7 @@ class DodaiosToolHub:
     def create_document(self, path_str: str, content: str) -> str:
         p = Path(path_str).expanduser().resolve()
         if not is_safe_user_path(p):
-            p = Path("/home/prakash/Documents") / Path(path_str).name
+            p = (Path.home() / "Documents") / Path(path_str).name
         try:
             p.parent.mkdir(parents=True, exist_ok=True)
             with open(p, "w", encoding="utf-8") as f:
@@ -3330,7 +3330,7 @@ class DodaiosToolHub:
     def append_document(self, path_str: str, content: str) -> str:
         p = Path(path_str).expanduser().resolve()
         if not is_safe_user_path(p):
-            p = Path("/home/prakash/Documents") / Path(path_str).name
+            p = (Path.home() / "Documents") / Path(path_str).name
         try:
             p.parent.mkdir(parents=True, exist_ok=True)
             with open(p, "a", encoding="utf-8") as f:
@@ -3339,10 +3339,10 @@ class DodaiosToolHub:
         except Exception as e:
             return f"Failed to append to document: {e}"
 
-    def list_files(self, dir_str: str = "/home/prakash/Documents") -> str:
+    def list_files(self, dir_str: str = "") -> str:
         p = Path(dir_str).expanduser().resolve()
         if not is_safe_user_path(p) or not p.is_dir():
-            p = Path("/home/prakash/Documents")
+            p = Path(dir_str) if dir_str else (Path.home() / "Documents")
         try:
             entries = []
             for item in sorted(p.iterdir()):
@@ -3360,7 +3360,7 @@ class DodaiosToolHub:
         draft = f"To: {recipient}\nSubject: {subject}\nDate: {time.strftime('%a, %d %b %Y %H:%M:%S')}\n\n{body}\n"
         saved_path = ""
         if save_draft:
-            drafts_dir = Path("/home/prakash/Documents/Drafts")
+            drafts_dir = Path.home() / "Documents/Drafts"
             try:
                 drafts_dir.mkdir(parents=True, exist_ok=True)
                 slug = "".join(c for c in subject if c.isalnum() or c in "_- ").strip().replace(" ", "_")[:30] or "draft"
@@ -5114,7 +5114,7 @@ class AudioVoiceEngine(QObject):
                 return f"Timer started for {dur_str}."
             elif name == "search_files":
                 pat = args.get("pattern", "*")
-                p = args.get("search_path", "/home/prakash/Documents")
+                p = args.get("search_path", str(Path.home() / "Documents"))
                 matches = self.tool_hub.search_files(pat, p)
                 if matches:
                     return f"Found {len(matches)} files:\n" + "\n".join(matches[:10])
@@ -5133,7 +5133,7 @@ class AudioVoiceEngine(QObject):
                 c = args.get("content", "")
                 return self.tool_hub.append_document(p, c)
             elif name == "list_files":
-                d = args.get("directory", "/home/prakash/Documents")
+                d = args.get("directory", str(Path.home() / "Documents"))
                 return self.tool_hub.list_files(d)
             elif name == "browser_open":
                 url = args.get("url", "")
@@ -5783,7 +5783,7 @@ class AudioVoiceEngine(QObject):
             if cf_m:
                 fn = cf_m.group(1).strip()
                 fc = cf_m.group(2).strip()
-                docs_dir = Path("/home/prakash/Documents")
+                docs_dir = Path.home() / "Documents"
                 target_f = docs_dir / fn
                 try:
                     with open(target_f, "w", encoding="utf-8") as f:
@@ -5791,12 +5791,12 @@ class AudioVoiceEngine(QObject):
                     self.last_generated_file = str(target_f)
                     self.tool_hub.last_created_file = str(target_f)
                     save_last_created_file_metadata(str(target_f))
-                    return (f"Created file '{fn}' in /home/prakash/Documents. Say 'open it' or 'open {fn}' to view it.", f"File: Created ({fn})", str(target_f))
+                    return (f"Created file '{fn}' in {out_file.parent}. Say 'open it' or 'open {fn}' to view it.", f"File: Created ({fn})", str(target_f))
                 except Exception as e:
                     return (f"Failed to create file: {e}", "File: Error", "")
 
         if any(p in q_lower for p in ["list files", "show files", "my files in documents"]):
-            docs_dir = Path("/home/prakash/Documents")
+            docs_dir = Path.home() / "Documents"
             try:
                 files = [p.name for p in docs_dir.iterdir() if not p.name.startswith(".")]
                 f_list = ", ".join(files[:8]) if files else "No files found."
@@ -5808,7 +5808,7 @@ class AudioVoiceEngine(QObject):
             rf_m = re.search(r"(?:read|read\s+content\s+of|show\s+content\s+of|cat|print)\s+(?:file\s+)?([a-zA-Z0-9_\-.]+)$", q_clean, re.I)
             if rf_m:
                 fn = rf_m.group(1).strip()
-                docs_dir = Path("/home/prakash/Documents")
+                docs_dir = Path.home() / "Documents"
                 if fn.lower() in ["that", "it", "this", "file", "code", "the file", "the code"] and self.last_generated_file:
                     target_f = Path(self.last_generated_file)
                 else:
@@ -6060,10 +6060,10 @@ class AudioVoiceEngine(QObject):
 
         if format_filter:
             search_dirs = [
-                Path("/home/prakash/Documents"),
-                Path("/home/prakash/Documents/Reports"),
-                Path("/home/prakash/Documents/Notes"),
-                Path("/home/prakash/Desktop"),
+                (Path.home() / "Documents"),
+                (Path.home() / "Documents/Reports"),
+                (Path.home() / "Documents/Notes"),
+                (Path.home() / "Desktop"),
                 Path("/run/media/prakash/TR_39/VOID")
             ]
             candidates = []
@@ -6151,10 +6151,10 @@ class AudioVoiceEngine(QObject):
                     target_f = doc_info["path"]
             if not target_f or not Path(target_f).exists():
                 search_dirs = [
-                    Path("/home/prakash/Documents"),
-                    Path("/home/prakash/Documents/Reports"),
-                    Path("/home/prakash/Documents/Notes"),
-                    Path("/home/prakash/Desktop"),
+                    (Path.home() / "Documents"),
+                    (Path.home() / "Documents/Reports"),
+                    (Path.home() / "Documents/Notes"),
+                    (Path.home() / "Desktop"),
                     Path("/run/media/prakash/TR_39/VOID")
                 ]
                 recent_files = []
@@ -6222,7 +6222,7 @@ class AudioVoiceEngine(QObject):
             else:
                 filename = "code.txt"
 
-            target_dir = Path("/home/prakash/Documents")
+            target_dir = Path.home() / "Documents"
             target_dir.mkdir(parents=True, exist_ok=True)
             out_file = target_dir / filename
 
@@ -6376,7 +6376,7 @@ if __name__ == "__main__":
                     "created_at": time.time(),
                 }
                 self.memory.learn(f"Created code text file at {out_file.name}")
-                reply_msg = f"Created code file '{out_file.name}' in /home/prakash/Documents. Say 'open it' or 'open {out_file.name}' to view it."
+                reply_msg = f"Created code file '{out_file.name}' in {out_file.parent}. Say 'open it' or 'open {out_file.name}' to view it."
                 return (reply_msg, f"Code: Saved ({out_file.name})", str(out_file))
             except Exception as e:
                 return (f"Failed to create code text file: {e}", "File Error", "")
@@ -6500,7 +6500,7 @@ if __name__ == "__main__":
             if not title:
                 title = f"Dictation_{time.strftime('%Y%m%d_%H%M%S')}"
             safe_title = "".join(c for c in title if c.isalnum() or c in "_- ").strip().replace(" ", "_")
-            notes_dir = Path("/home/prakash/Documents/Notes")
+            notes_dir = Path.home() / "Documents/Notes"
             notes_dir.mkdir(parents=True, exist_ok=True)
             d_file = notes_dir / f"{safe_title}.md"
             if not d_file.exists():
@@ -8749,7 +8749,7 @@ class VoidMiniWidget(QWidget):
 
     def _on_terminate(self) -> None:
         print("[VOID] Terminate code 0 received. Shutting down assistant permanently...")
-        for p in [CONFIG_DIR / ".void_launcher.json", Path("/home/prakash/.dodaios/data/.void_launcher.json")]:
+        for p in [CONFIG_DIR / ".void_launcher.json", Path.home() / ".dodaios/data/.void_launcher.json"]:
             try:
                 if p.exists():
                     p.unlink()

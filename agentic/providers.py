@@ -437,7 +437,7 @@ class AIProviderManager:
         return prov
 
     def _load_config(self) -> None:
-        cfg_path = Path("/run/media/prakash/TR_39/VOID/config/ai_providers.json")
+        cfg_path = (Path(__file__).resolve().parent.parent / "config" / "ai_providers.json")
         if cfg_path.exists():
             try:
                 data = json.loads(cfg_path.read_text(encoding="utf-8"))
@@ -531,7 +531,7 @@ class AIProviderManager:
         return out
 
     def _save_full_config(self) -> None:
-        cfg_path = Path("/run/media/prakash/TR_39/VOID/config/ai_providers.json")
+        cfg_path = (Path(__file__).resolve().parent.parent / "config" / "ai_providers.json")
         cfg_path.parent.mkdir(parents=True, exist_ok=True)
         data = {
             "mode": self.mode,
