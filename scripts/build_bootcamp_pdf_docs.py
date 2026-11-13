@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate DODAI_OS_Executive_Summary.pdf and DODAI_OS_Model_and_Function_Documentation.pdf
+Generate VOID_AI_Executive_Summary.pdf and VOID_AI_Model_and_Function_Documentation.pdf
 using modern HTML5/CSS print layouts and Chromium headless PDF engine.
 """
 
@@ -10,7 +10,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-OUT_DIR = Path("/run/media/prakash/TR_39/VOID/DODAI_OS_INTEL_BOOTCAMP_SUBMISSION")
+OUT_DIR = Path("/run/media/prakash/TR_39/VOID/submission")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 CHROMIUM = shutil.which("chromium-browser") or shutil.which("chromium") or shutil.which("google-chrome")
 
@@ -25,7 +25,7 @@ CSS_BASE = """
         color: #64748b;
     }
     @bottom-left {
-        content: "DODAI OS • Intel AI for Future Workforce Bootcamp 2026";
+        content: "VOID AI • Intel AI for Future Workforce Bootcamp 2026";
         font-size: 8pt;
         font-family: 'Inter', system-ui, sans-serif;
         color: #94a3b8;
@@ -175,7 +175,7 @@ def build_executive_summary_pdf():
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>DODAI OS — Executive Summary Dossier</title>
+<title>VOID AI — Executive Summary Dossier</title>
 <style>{CSS_BASE}</style>
 </head>
 <body>
@@ -185,7 +185,7 @@ def build_executive_summary_pdf():
             <span>Intel AI for Future Workforce Bootcamp 2026</span>
             <span>Submission Track: Agentic AI</span>
         </div>
-        <h1 class="doc-title">DODAI OS: Executive Summary & Project Abstract</h1>
+        <h1 class="doc-title">VOID AI: Executive Summary & Project Abstract</h1>
         <div class="doc-subtitle">Your Local Autonomous Linux Intelligence • Agentic Linux AI Assistant</div>
         <div class="doc-author">Author & System Architect: Prakash (prakash2006-xl) | Platform: Fedora Linux 40+ KDE Plasma 6 (Wayland)</div>
     </div>
@@ -211,23 +211,23 @@ def build_executive_summary_pdf():
 
     <div class="callout-box">
         <div class="callout-title">💡 Strategic Vision & Core Concept</div>
-        <div>DODAI OS is a local-first, verified autonomous AI operating assistant engineered for Linux personal computers. While standard desktop assistants operate as passive chatbots that respond with text, DODAI OS functions as an active operating system companion that understands user objectives, constructs multi-step Directed Acyclic Graph (DAG) execution plans, orchestrates specialized agents, executes real system and development tools, independently verifies ground-truth outcomes, and self-heals through bounded retries.</div>
+        <div>VOID AI is a local-first, verified autonomous AI operating assistant engineered for Linux personal computers. While standard desktop assistants operate as passive chatbots that respond with text, VOID AI functions as an active operating system companion that understands user objectives, constructs multi-step Directed Acyclic Graph (DAG) execution plans, orchestrates specialized agents, executes real system and development tools, independently verifies ground-truth outcomes, and self-heals through bounded retries.</div>
     </div>
 
     <h2>1. Executive Summary (185 Words)</h2>
-    <p>DODAI OS transforms the Linux desktop into an autonomous, agentic operating workplace. While traditional desktop assistants function merely as passive conversational wrappers that answer prompts with text, DODAI OS operates as an active, permission-aware multi-agent operating system. It possesses the capability to understand high-level user intent, formulate structured multi-step plans as Directed Acyclic Graphs (DAGs), dynamically delegate tasks across specialized autonomous agents, execute system and development tools in sandboxed workspaces, independently verify physical ground-truth results, self-heal through bounded retries, and retain memory across a 7-day rolling window.</p>
-    <p>DODAI OS uniquely solves the tension between instant responsiveness and deep reasoning through a <strong>Dual-Tier Coexistence Architecture</strong>: Tier 1 provides sub-5ms local DBus and regex dispatch for instant desktop controls without GPU overhead; Tier 2 activates a hierarchical team of 7 specialized agents (Supervisor, Planner, Linux Intelligence, Developer, Research, Tool Execution, Verifier, and Recovery) for complex multi-step workflows. All operations strictly obey a 4-Tier Security Doctrine ensuring zero unauthorized root modifications and strict human-in-the-loop approval gating, making DODAI OS a private, robust, edge-first Agentic AI platform.</p>
+    <p>VOID AI transforms the Linux desktop into an autonomous, agentic operating workplace. While traditional desktop assistants function merely as passive conversational wrappers that answer prompts with text, VOID AI operates as an active, permission-aware multi-agent operating system. It possesses the capability to understand high-level user intent, formulate structured multi-step plans as Directed Acyclic Graphs (DAGs), dynamically delegate tasks across specialized autonomous agents, execute system and development tools in sandboxed workspaces, independently verify physical ground-truth results, self-heal through bounded retries, and retain memory across a 7-day rolling window.</p>
+    <p>VOID AI uniquely solves the tension between instant responsiveness and deep reasoning through a <strong>Dual-Tier Coexistence Architecture</strong>: Tier 1 provides sub-5ms local DBus and regex dispatch for instant desktop controls without GPU overhead; Tier 2 activates a hierarchical team of 7 specialized agents (Supervisor, Planner, Linux Intelligence, Developer, Research, Tool Execution, Verifier, and Recovery) for complex multi-step workflows. All operations strictly obey a 4-Tier Security Doctrine ensuring zero unauthorized root modifications and strict human-in-the-loop approval gating, making VOID AI a private, robust, edge-first Agentic AI platform.</p>
 
     <h2>2. Project Abstract (310 Words)</h2>
     <p>Personal computing in the modern knowledge economy remains fundamentally manual. Knowledge workers, developers, and researchers spend considerable cognitive effort switching contexts, diagnosing system health, organizing workspaces, compiling research, scaffolding software projects, and verifying computational workflows. Existing artificial intelligence assistants remain confined to text generation; they lack operating system integration, cannot inspect system states, fail to verify whether their actions succeeded, and rely entirely on external cloud infrastructure that compromises user data privacy.</p>
-    <p>DODAI OS solves this paradigm bottleneck by introducing an autonomous operating layer tailored for Fedora Linux (KDE Plasma 6 on Wayland). Built upon a local-first philosophy, DODAI OS integrates state-of-the-art quantized neural foundation models (including an ultra-lite 370M LoRA-tuned local brain and multi-modal models) alongside an open-architecture cloud AI bridge. The platform features an autonomous hierarchical multi-agent framework: when a user gives a high-level goal, the Supervisor and Planner Agents construct a Directed Acyclic Graph (DAG) with explicit task dependencies, delegating execution across dedicated Linux Intelligence, Developer, Research, and Tool Execution agents interfacing with 105 native tools.</p>
-    <p>Crucially, DODAI OS enforces an architectural separation between execution and certification. An independent Verifier Agent evaluates ground-truth physical artifacts (file outputs, process states, stderr streams, unit test pass rates) before declaring task completion. If discrepancies arise, a bounded Recovery Agent analyzes errors and replans execution without infinite loops. Operating alongside a sub-5ms local fast-path for hardware window and media management, continuous acoustic wake recognition via Vosk, Faster-Whisper int8 STT, Piper neural speech synthesis, and 7-day rolling persistent thought retention, DODAI OS establishes a new standard for private, resilient, and verified Agentic AI operating systems on Linux personal computing hardware.</p>
+    <p>VOID AI solves this paradigm bottleneck by introducing an autonomous operating layer tailored for Fedora Linux (KDE Plasma 6 on Wayland). Built upon a local-first philosophy, VOID AI integrates state-of-the-art quantized neural foundation models (including an ultra-lite 370M LoRA-tuned local brain and multi-modal models) alongside an open-architecture cloud AI bridge. The platform features an autonomous hierarchical multi-agent framework: when a user gives a high-level goal, the Supervisor and Planner Agents construct a Directed Acyclic Graph (DAG) with explicit task dependencies, delegating execution across dedicated Linux Intelligence, Developer, Research, and Tool Execution agents interfacing with 105 native tools.</p>
+    <p>Crucially, VOID AI enforces an architectural separation between execution and certification. An independent Verifier Agent evaluates ground-truth physical artifacts (file outputs, process states, stderr streams, unit test pass rates) before declaring task completion. If discrepancies arise, a bounded Recovery Agent analyzes errors and replans execution without infinite loops. Operating alongside a sub-5ms local fast-path for hardware window and media management, continuous acoustic wake recognition via Vosk, Faster-Whisper int8 STT, Piper neural speech synthesis, and 7-day rolling persistent thought retention, VOID AI establishes a new standard for private, resilient, and verified Agentic AI operating systems on Linux personal computing hardware.</p>
 
     <div class="page-break"></div>
     <div class="header-bar"></div>
 
     <h2>3. Short Description for Google Submission Form</h2>
-    <p>DODAI OS is an autonomous, local-first Agentic AI desktop operating assistant for Linux. Unlike conventional chatbots that produce text, DODAI OS understands complex natural-language goals, decomposes them into Directed Acyclic Graph (DAG) execution plans, and orchestrates a team of specialized agents (Linux Intel, Developer, Research, Tool Execution) to interact with real system tools, scaffold software, execute shell diagnostics, and compile publication-grade reports. It features an independent Verifier Agent that inspects physical filesystem and process ground truth, a bounded self-healing Recovery Agent, a sub-5ms fast path for window and hardware control, a 1.5GB SSD memory engine with 7-day rolling retention, and strict 4-Tier permission containment—delivering fully verified, private desktop autonomy.</p>
+    <p>VOID AI is an autonomous, local-first Agentic AI desktop operating assistant for Linux. Unlike conventional chatbots that produce text, VOID AI understands complex natural-language goals, decomposes them into Directed Acyclic Graph (DAG) execution plans, and orchestrates a team of specialized agents (Linux Intel, Developer, Research, Tool Execution) to interact with real system tools, scaffold software, execute shell diagnostics, and compile publication-grade reports. It features an independent Verifier Agent that inspects physical filesystem and process ground truth, a bounded self-healing Recovery Agent, a sub-5ms fast path for window and hardware control, a 1.5GB SSD memory engine with 7-day rolling retention, and strict 4-Tier permission containment—delivering fully verified, private desktop autonomy.</p>
 
     <h2>4. Five Key Innovations</h2>
     <table class="data-table">
@@ -276,8 +276,8 @@ def build_executive_summary_pdf():
         <li><strong>4-Tier Security & Sandbox Isolation:</strong> Strictly enforces Level 1 (ReadOnly) to Level 4 (Forbidden) boundaries protecting operating system kernel integrity.</li>
     </ul>
 
-    <h2>6. Why DODAI OS Qualifies as an Agentic AI Project</h2>
-    <p>DODAI OS satisfies every foundational pillar of genuine Agentic AI:
+    <h2>6. Why VOID AI Qualifies as an Agentic AI Project</h2>
+    <p>VOID AI satisfies every foundational pillar of genuine Agentic AI:
     (1) <em>Autonomous Perception</em> via continuous acoustic listening and operating system state monitoring;
     (2) <em>Deliberation</em> via the Supervisor and Planner Agents that formulate structured multi-step DAG plans;
     (3) <em>Delegation</em> to specialized agents with distinct role boundaries;
@@ -287,10 +287,10 @@ def build_executive_summary_pdf():
     (7) <em>Retention</em> across a 7-day rolling memory pool.</p>
 
     <h2>7. Real-World Problem Solved</h2>
-    <p>Eliminates the cognitive friction and manual fragmentation of Linux desktop productivity. Modern engineers and knowledge workers waste 20-30% of their workday on repetitive operations: diagnosing memory leaks, checking network ports, organizing files, converting research into structured reports, scaffolding repetitive boilerplate, and toggling windows. DODAI OS acts as a 24/7 private, local autonomous partner that executes these multi-step workflows end-to-end with verified ground truth—saving hours daily while keeping confidential data 100% on the user's machine.</p>
+    <p>Eliminates the cognitive friction and manual fragmentation of Linux desktop productivity. Modern engineers and knowledge workers waste 20-30% of their workday on repetitive operations: diagnosing memory leaks, checking network ports, organizing files, converting research into structured reports, scaffolding repetitive boilerplate, and toggling windows. VOID AI acts as a 24/7 private, local autonomous partner that executes these multi-step workflows end-to-end with verified ground truth—saving hours daily while keeping confidential data 100% on the user's machine.</p>
 </body>
 </html>"""
-    out_pdf = OUT_DIR / "DODAI_OS_Executive_Summary.pdf"
+    out_pdf = OUT_DIR / "VOID_AI_Executive_Summary.pdf"
     render_html_to_pdf(html, out_pdf)
 
 def build_model_and_function_pdf():
@@ -298,7 +298,7 @@ def build_model_and_function_pdf():
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>DODAI OS — AI Models, Agent Functions and Execution Capabilities</title>
+<title>VOID AI — AI Models, Agent Functions and Execution Capabilities</title>
 <style>{CSS_BASE}</style>
 </head>
 <body>
@@ -309,7 +309,7 @@ def build_model_and_function_pdf():
             <span>Technical Documentation Series</span>
         </div>
         <h1 class="doc-title">AI Models, Agent Functions and Execution Capabilities</h1>
-        <div class="doc-subtitle">Comprehensive Architectural & Model Evaluation Dossier for DODAI OS</div>
+        <div class="doc-subtitle">Comprehensive Architectural & Model Evaluation Dossier for VOID AI</div>
         <div class="doc-author">Author: Prakash (prakash2006-xl) | Platform: Fedora Linux 40+ (KDE Plasma 6 / Wayland)</div>
     </div>
 
@@ -369,14 +369,14 @@ def build_model_and_function_pdf():
             </tr>
             <tr class="even-row">
                 <td><strong>Multi-Agent Orchestrator</strong></td>
-                <td>DODAI OS DAG Core<br>(Supervisor & Planner)</td>
+                <td>VOID AI DAG Core<br>(Supervisor & Planner)</td>
                 <td>Decomposes natural language goals into Directed Acyclic Graphs with dependency arrays and role assignments.</td>
                 <td>Local Python Async Engine (`agentic/`)</td>
                 <td><span class="badge badge-green">Production</span></td>
             </tr>
             <tr class="odd-row">
                 <td><strong>Tool Hub & DBus</strong></td>
-                <td>105 Dodaios Native Tools + KWin Wayland DBus</td>
+                <td>105 VOID AI Native Tools + KWin Wayland DBus</td>
                 <td>Direct operating system interaction: window management, process inspection, filesystem manipulation, and documents.</td>
                 <td>Native Linux Subprocesses & DBus Calls</td>
                 <td><span class="badge badge-green">Production</span></td>
@@ -388,7 +388,7 @@ def build_model_and_function_pdf():
     <div class="header-bar"></div>
 
     <h2>2. Architectural Taxonomy: LLM vs. Agent vs. Orchestration vs. Executable Tool</h2>
-    <p>To avoid conceptual ambiguity, DODAI OS maintains a strict architectural distinction across four tiers:</p>
+    <p>To avoid conceptual ambiguity, VOID AI maintains a strict architectural distinction across four tiers:</p>
     <ul>
         <li><strong>Foundation LLM (The Cognitive Engine):</strong> The neural language model (`nano-brain`, `lfm3-omni:2b`, or cloud provider) acts purely as an inference predictor. It interprets language, classifies intents, and predicts structured responses. It does <em>not</em> possess execution authority.</li>
         <li><strong>Agent (The Role-Bounded Actor):</strong> An autonomous software entity encapsulating a specific role (e.g., Developer Agent, Linux Intelligence Agent, Verifier Agent). Each agent has a defined system prompt, constrained tool access, state tracking, and specialized decision boundaries.</li>
@@ -408,7 +408,7 @@ def build_model_and_function_pdf():
     </ol>
 
     <h2>4. Local Model Lifecycle & Memory Preservation</h2>
-    <p>DODAI OS addresses the resource constraints of edge personal computers through dynamic model lifecycle management:</p>
+    <p>VOID AI addresses the resource constraints of edge personal computers through dynamic model lifecycle management:</p>
     <ul>
         <li><strong>Ultra-Lite nano-brain Residency:</strong> Consumes only 98MB to 140MB RAM. Responds in ~210ms to ~350ms, enabling real-time local chat with near-zero CPU and memory impact.</li>
         <li><strong>On-Demand lfm3-omni:2b Loading:</strong> When multi-modal tool calling is needed, Ollama loads the 1.7B GGUF weights into APU/GPU memory.</li>
@@ -478,7 +478,7 @@ def build_model_and_function_pdf():
     </table>
 </body>
 </html>"""
-    out_pdf = OUT_DIR / "DODAI_OS_Model_and_Function_Documentation.pdf"
+    out_pdf = OUT_DIR / "VOID_AI_Model_and_Function_Documentation.pdf"
     render_html_to_pdf(html, out_pdf)
 
 if __name__ == "__main__":

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Generate High-Resolution Architecture & Workflow Diagrams for DODAI OS Intel Bootcamp Submission
+Generate High-Resolution Architecture & Workflow Diagrams for VOID AI Intel Bootcamp Submission
 Outputs:
-  - DODAI_OS_System_Architecture.png (300 DPI)
-  - DODAI_OS_Agent_Workflow.png (300 DPI)
+  - VOID_AI_System_Architecture.png (300 DPI)
+  - VOID_AI_Agent_Workflow.png (300 DPI)
 """
 
 import os
@@ -13,7 +13,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
-OUT_DIR = Path("/run/media/prakash/TR_39/VOID/DODAI_OS_INTEL_BOOTCAMP_SUBMISSION")
+OUT_DIR = Path("/run/media/prakash/TR_39/VOID/submission")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 def generate_system_architecture():
@@ -27,7 +27,7 @@ def generate_system_architecture():
     ax.set_facecolor('#0f172a')
 
     # Main Header
-    ax.text(7.0, 8.15, "DODAI OS — SYSTEM ARCHITECTURE & RUNTIME ENGINE",
+    ax.text(7.0, 8.15, "VOID AI — SYSTEM ARCHITECTURE & RUNTIME ENGINE",
             ha='center', va='center', color='#38bdf8', fontsize=16, fontweight='bold')
     ax.text(7.0, 7.85, "Local Autonomous Linux Intelligence • Fedora KDE Plasma 6 (Wayland) • Intel Bootcamp 2026",
             ha='center', va='center', color='#94a3b8', fontsize=10)
@@ -141,7 +141,7 @@ def generate_system_architecture():
 
     tool_cols = [
         ("4-Tier Security Gate", "• Level 1: ReadOnly\n• Level 2: Safe Workspace\n• Level 3: User Approval\n• Level 4: FORBIDDEN (sudo, /etc)"),
-        ("105 Dodaios Native Tools", "• Multi-Source Web Search\n• Safe Python Scaffolding\n• PyTest Workspace Runner\n• Vitals (/proc, df, loadavg)"),
+        ("105 VOID AI Native Tools", "• Multi-Source Web Search\n• Safe Python Scaffolding\n• PyTest Workspace Runner\n• Vitals (/proc, df, loadavg)"),
         ("Desktop Document Engine", "• Publication-Grade PDF (HTML/CSS)\n• Formatted Word Docs (.docx)\n• Excel Workbooks (.xlsx)\n• Dynamic Matplotlib Diagrams"),
         ("Desktop & Media Control", "• KWin DBus Window Calls\n• Chromium Tab/Window DBus\n• PipeWire Audio / WirePlumber\n• Universal File/App Launcher")
     ]
@@ -155,7 +155,7 @@ def generate_system_architecture():
                 arrowprops=dict(arrowstyle="->", color='#10b981', lw=2.0))
 
     plt.tight_layout()
-    out_file = OUT_DIR / "DODAI_OS_System_Architecture.png"
+    out_file = OUT_DIR / "VOID_AI_System_Architecture.png"
     plt.savefig(out_file, facecolor=fig.get_facecolor(), edgecolor='none', bbox_inches='tight')
     plt.close(fig)
     print(f"Generated: {out_file}")
@@ -171,7 +171,7 @@ def generate_agent_workflow():
     ax.set_facecolor('#0f172a')
 
     # Header
-    ax.text(7.0, 8.15, "DODAI OS — AUTONOMOUS AGENTIC EXECUTION WORKFLOW & VERIFICATION CYCLE",
+    ax.text(7.0, 8.15, "VOID AI — AUTONOMOUS AGENTIC EXECUTION WORKFLOW & VERIFICATION CYCLE",
             ha='center', va='center', color='#38bdf8', fontsize=15, fontweight='bold')
     ax.text(7.0, 7.85, "Goal Decomposition • DAG Execution • Independent Ground-Truth Verification • Self-Healing Recovery",
             ha='center', va='center', color='#94a3b8', fontsize=10)
@@ -232,7 +232,7 @@ def generate_agent_workflow():
                 ha='center', va='center', color='#f87171', fontsize=7.8, fontweight='bold')
 
     plt.tight_layout()
-    out_file = OUT_DIR / "DODAI_OS_Agent_Workflow.png"
+    out_file = OUT_DIR / "VOID_AI_Agent_Workflow.png"
     plt.savefig(out_file, facecolor=fig.get_facecolor(), edgecolor='none', bbox_inches='tight')
     plt.close(fig)
     print(f"Generated: {out_file}")

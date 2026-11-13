@@ -10,7 +10,7 @@
 | :--- | :---: | :---: | :---: | :---: | :--- | :---: |
 | `test_3d_globe.py` | 1 | 1 | 0 | 0.12s | 3D Fibonacci Coordinate Projection | **PASS** |
 | `test_3d_globe_states.py` | 10 | 10 | 0 | 0.25s | Visual Color State Transitions | **PASS** |
-| `test_all_tools_and_emotion.py` | 10 | 10 | 0 | 2.05s | 105 Dodaios Native Tools Connectivity | **PASS** |
+| `test_all_tools_and_emotion.py` | 10 | 10 | 0 | 2.05s | 105 VOID AI Native Tools Connectivity | **PASS** |
 | `test_audio_and_wake_isolation.py` | 6 | 6 | 0 | 0.45s | PipeWire Wake Isolation & Vosk FST | **PASS** |
 | `test_browser_and_email.py` | 9 | 9 | 0 | 1.82s | Chromium Tab Automation & Webmail | **PASS** |
 | `test_dictation_and_documents.py` | 14 | 14 | 0 | 26.4s | Word (.docx) & Excel (.xlsx) Drafting | **PASS** |

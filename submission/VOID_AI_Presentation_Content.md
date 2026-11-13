@@ -1,11 +1,11 @@
-# DODAI OS — Official Project Presentation Deck Script
+# VOID AI — Official Project Presentation Deck Script
 **Submission:** Intel Digital Readiness – AI for Future Workforce Agentic AI Bootcamp 2026  
 **Format:** 12 Jury-Readable Slides with Complete Visual Recommendations and Speaker Notes  
 
 ---
 
 ## Slide 1: Title & Vision
-- **Header:** DODAI OS: Agentic Linux AI Assistant
+- **Header:** VOID AI: Agentic Linux AI Assistant
 - **Subtitle:** Your Local Autonomous Linux Intelligence
 - **Presenter / Team:** Prakash (`prakash2006-xl`)
 - **Event:** Intel Digital Readiness – AI for Future Workforce Agentic AI Bootcamp 2026
@@ -25,7 +25,7 @@
 
 ---
 
-## Slide 3: Our Solution — DODAI OS
+## Slide 3: Our Solution — VOID AI
 - **Header:** An Autonomous Operating Layer for Linux
 - **Bullet Points:**
   - **Local-First & Private:** 100% offline-capable on AMD Ryzen 7 with zero mandatory cloud telemetry.
@@ -37,10 +37,10 @@
 
 ---
 
-## Slide 4: Why DODAI OS is Genuine Agentic AI
+## Slide 4: Why VOID AI is Genuine Agentic AI
 - **Header:** The Agentic AI Difference Matrix
 - **Comparison Table:**
-  | Dimension | Conventional Chatbot | Typical AI Assistant | DODAI OS (Agentic AI) |
+  | Dimension | Conventional Chatbot | Typical AI Assistant | VOID AI (Agentic AI) |
   | :--- | :--- | :--- | :--- |
   | **Core Paradigm** | Single-turn text generation | Voice search wrapper | Multi-Step DAG Task Execution |
   | **Tool Access** | Zero tool execution | Static web API calls | 105 Native Linux Tools + DBus |
@@ -58,7 +58,7 @@
   - **Tier 2 (Hierarchical DAG Core):** Supervisor classifies intent; Planner constructs dynamic task dependencies.
   - **Perception Layer:** Vosk real-time Kaldi FST wake recognition + Faster-Whisper int8 STT.
   - **Cognitive Layer:** Ultra-lite local `nano-brain` (370M LoRA) + `lfm3-omni:2b` + Cloud bridge.
-- **Visual:** High-resolution diagram (`DODAI_OS_System_Architecture.png`).
+- **Visual:** High-resolution diagram (`VOID_AI_System_Architecture.png`).
 
 ---
 
@@ -70,7 +70,7 @@
   3. **Linux Intelligence Agent:** Direct telemetry of `/proc`, CPU loads, memory, disks, and active network ports.
   4. **Developer Agent:** Automated project scaffolding, code writing, and unit test execution in sandbox.
   5. **Research Agent:** Multi-facet web intelligence gathering and structured document synthesis.
-  6. **Tool Execution Agent:** Safe interaction with 105 Dodaios native desktop tools.
+  6. **Tool Execution Agent:** Safe interaction with 105 VOID AI native desktop tools.
   7. **Verifier & Recovery Agents:** Ground-truth certification and bounded self-healing.
 - **Visual:** Agent role cards with input/output communication flow.
 
@@ -142,5 +142,5 @@
   - Integration with Intel OpenVINO for NPU-accelerated neural inference on Intel Core Ultra.
   - Multi-agent swarm expansion with distributed peer-to-peer task offloading.
   - Native Wayland screen vision & multimodal document parsing.
-- **Closing Statement:** DODAI OS proves that personal AI can be autonomous, verified, private, and blazingly fast on Linux personal computers.
+- **Closing Statement:** VOID AI proves that personal AI can be autonomous, verified, private, and blazingly fast on Linux personal computers.
 - **Contact:** `https://github.com/prakash2006-xl/VOID-.git`

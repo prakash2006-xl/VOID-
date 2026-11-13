@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-DODAI OS Master Submission Package Generator for Intel Digital Readiness Bootcamp 2026
-Generates all remaining deliverables into DODAI_OS_INTEL_BOOTCAMP_SUBMISSION/:
-  1. DODAI_OS_Project_Abstract.txt
-  2. DODAI_OS_Submission_Checklist.md
-  3. DODAI_OS_Presentation_Content.md
-  4. DODAI_OS_Project_Deck.pptx
-  5. DODAI_OS_Executive_Summary.pdf
-  6. DODAI_OS_Model_and_Function_Documentation.pdf
-  7. DODAI_OS_Project_Report.docx
-  8. DODAI_OS_Project_Report.pdf
+VOID AI Master Submission Package Generator for Intel Digital Readiness Bootcamp 2026
+Generates all remaining deliverables into VOID_AI_INTEL_BOOTCAMP_SUBMISSION/:
+  1. VOID_AI_Project_Abstract.txt
+  2. VOID_AI_Submission_Checklist.md
+  3. VOID_AI_Presentation_Content.md
+  4. VOID_AI_Project_Deck.pptx
+  5. VOID_AI_Executive_Summary.pdf
+  6. VOID_AI_Model_and_Function_Documentation.pdf
+  7. VOID_AI_Project_Report.docx
+  8. VOID_AI_Project_Report.pdf
 """
 
 import sys
@@ -19,42 +19,42 @@ import shutil
 import subprocess
 from pathlib import Path
 
-OUT_DIR = Path("/run/media/prakash/TR_39/VOID/DODAI_OS_INTEL_BOOTCAMP_SUBMISSION")
+OUT_DIR = Path("/run/media/prakash/TR_39/VOID/submission")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # -----------------------------------------------------------------------------
-# 1. GENERATE DODAI_OS_Project_Abstract.txt
+# 1. GENERATE VOID_AI_Project_Abstract.txt
 # -----------------------------------------------------------------------------
 def generate_project_abstract():
     content = """================================================================================
-DODAI OS — AGENTIC LINUX AI ASSISTANT
+VOID AI — AGENTIC LINUX AI ASSISTANT
 INTEL DIGITAL READINESS — AI FOR FUTURE WORKFORCE AGENTIC AI BOOTCAMP 2026
 SUBMISSION ABSTRACT & METADATA DOSSIER
 Submission Deadline: November 22, 2026
 ================================================================================
 
 PROJECT TITLE:
-DODAI OS – Agentic Linux AI Assistant
+VOID AI – Agentic Linux AI Assistant
 
 TAGLINE:
 Your Local Autonomous Linux Intelligence.
 
 A. EXECUTIVE SUMMARY (185 WORDS):
-DODAI OS transforms the Linux desktop into an autonomous, agentic operating workplace. While traditional desktop assistants function merely as passive conversational wrappers that answer prompts with text, DODAI OS operates as an active, permission-aware multi-agent operating system. It possesses the capability to understand high-level user intent, formulate structured multi-step plans as Directed Acyclic Graphs (DAGs), dynamically delegate tasks across specialized autonomous agents, execute system and development tools in sandboxed workspaces, independently verify physical ground-truth results, self-heal through bounded retries, and retain memory across a 7-day rolling window. 
+VOID AI transforms the Linux desktop into an autonomous, agentic operating workplace. While traditional desktop assistants function merely as passive conversational wrappers that answer prompts with text, VOID AI operates as an active, permission-aware multi-agent operating system. It possesses the capability to understand high-level user intent, formulate structured multi-step plans as Directed Acyclic Graphs (DAGs), dynamically delegate tasks across specialized autonomous agents, execute system and development tools in sandboxed workspaces, independently verify physical ground-truth results, self-heal through bounded retries, and retain memory across a 7-day rolling window. 
 
-DODAI OS uniquely solves the tension between instant responsiveness and deep reasoning through a Dual-Tier Coexistence Architecture: Tier 1 provides sub-5ms local DBus and regex dispatch for instant desktop controls without GPU overhead; Tier 2 activates a hierarchical team of 7 specialized agents (Supervisor, Planner, Linux Intelligence, Developer, Research, Tool Execution, Verifier, and Recovery) for complex multi-step workflows. All operations strictly obey a 4-Tier Security Doctrine ensuring zero unauthorized root modifications and strict human-in-the-loop approval gating, making DODAI OS a private, robust, edge-first Agentic AI platform.
+VOID AI uniquely solves the tension between instant responsiveness and deep reasoning through a Dual-Tier Coexistence Architecture: Tier 1 provides sub-5ms local DBus and regex dispatch for instant desktop controls without GPU overhead; Tier 2 activates a hierarchical team of 7 specialized agents (Supervisor, Planner, Linux Intelligence, Developer, Research, Tool Execution, Verifier, and Recovery) for complex multi-step workflows. All operations strictly obey a 4-Tier Security Doctrine ensuring zero unauthorized root modifications and strict human-in-the-loop approval gating, making VOID AI a private, robust, edge-first Agentic AI platform.
 
 --------------------------------------------------------------------------------
 B. PROJECT ABSTRACT (310 WORDS):
 Personal computing in the modern knowledge economy remains fundamentally manual. Knowledge workers, developers, and researchers spend considerable cognitive effort switching contexts, diagnosing system health, organizing workspaces, compiling research, scaffolding software projects, and verifying computational workflows. Existing artificial intelligence assistants remain confined to text generation; they lack operating system integration, cannot inspect system states, fail to verify whether their actions succeeded, and rely entirely on external cloud infrastructure that compromises user data privacy.
 
-DODAI OS solves this paradigm bottleneck by introducing an autonomous operating layer tailored for Fedora Linux (KDE Plasma 6 on Wayland). Built upon a local-first philosophy, DODAI OS integrates state-of-the-art quantized neural foundation models (including an ultra-lite 370M LoRA-tuned local brain and multi-modal models) alongside an open-architecture cloud AI bridge. The platform features an autonomous hierarchical multi-agent framework: when a user gives a high-level goal, the Supervisor and Planner Agents construct a Directed Acyclic Graph (DAG) with explicit task dependencies, delegating execution across dedicated Linux Intelligence, Developer, Research, and Tool Execution agents interfacing with 105 native tools.
+VOID AI solves this paradigm bottleneck by introducing an autonomous operating layer tailored for Fedora Linux (KDE Plasma 6 on Wayland). Built upon a local-first philosophy, VOID AI integrates state-of-the-art quantized neural foundation models (including an ultra-lite 370M LoRA-tuned local brain and multi-modal models) alongside an open-architecture cloud AI bridge. The platform features an autonomous hierarchical multi-agent framework: when a user gives a high-level goal, the Supervisor and Planner Agents construct a Directed Acyclic Graph (DAG) with explicit task dependencies, delegating execution across dedicated Linux Intelligence, Developer, Research, and Tool Execution agents interfacing with 105 native tools.
 
-Crucially, DODAI OS enforces an architectural separation between execution and certification. An independent Verifier Agent evaluates ground-truth physical artifacts (file outputs, process states, stderr streams, unit test pass rates) before declaring task completion. If discrepancies arise, a bounded Recovery Agent analyzes errors and replans execution without infinite loops. Operating alongside a sub-5ms local fast-path for hardware window and media management, continuous acoustic wake recognition via Vosk, Faster-Whisper int8 STT, Piper neural speech synthesis, and 7-day rolling persistent thought retention, DODAI OS establishes a new standard for private, resilient, and verified Agentic AI operating systems on Linux personal computing hardware.
+Crucially, VOID AI enforces an architectural separation between execution and certification. An independent Verifier Agent evaluates ground-truth physical artifacts (file outputs, process states, stderr streams, unit test pass rates) before declaring task completion. If discrepancies arise, a bounded Recovery Agent analyzes errors and replans execution without infinite loops. Operating alongside a sub-5ms local fast-path for hardware window and media management, continuous acoustic wake recognition via Vosk, Faster-Whisper int8 STT, Piper neural speech synthesis, and 7-day rolling persistent thought retention, VOID AI establishes a new standard for private, resilient, and verified Agentic AI operating systems on Linux personal computing hardware.
 
 --------------------------------------------------------------------------------
 C. SHORT PROJECT DESCRIPTION (FOR GOOGLE SUBMISSION FORM):
-DODAI OS is an autonomous, local-first Agentic AI desktop operating assistant for Linux. Unlike conventional chatbots that produce text, DODAI OS understands complex natural-language goals, decomposes them into Directed Acyclic Graph (DAG) execution plans, and orchestrates a team of specialized agents (Linux Intel, Developer, Research, Tool Execution) to interact with real system tools, scaffold software, execute shell diagnostics, and compile publication-grade reports. It features an independent Verifier Agent that inspects physical filesystem and process ground truth, a bounded self-healing Recovery Agent, a sub-5ms fast path for window and hardware control, a 1.5GB SSD memory engine with 7-day rolling retention, and strict 4-Tier permission containment—delivering fully verified, private desktop autonomy.
+VOID AI is an autonomous, local-first Agentic AI desktop operating assistant for Linux. Unlike conventional chatbots that produce text, VOID AI understands complex natural-language goals, decomposes them into Directed Acyclic Graph (DAG) execution plans, and orchestrates a team of specialized agents (Linux Intel, Developer, Research, Tool Execution) to interact with real system tools, scaffold software, execute shell diagnostics, and compile publication-grade reports. It features an independent Verifier Agent that inspects physical filesystem and process ground truth, a bounded self-healing Recovery Agent, a sub-5ms fast path for window and hardware control, a 1.5GB SSD memory engine with 7-day rolling retention, and strict 4-Tier permission containment—delivering fully verified, private desktop autonomy.
 
 --------------------------------------------------------------------------------
 D. FIVE KEY INNOVATIONS:
@@ -74,7 +74,7 @@ E. FIVE IMPORTANT AGENTIC CAPABILITIES:
 
 --------------------------------------------------------------------------------
 F. WHY THIS PROJECT QUALIFIES AS AGENTIC AI:
-DODAI OS meets every criterion of the Agentic AI definition. Conventional chatbots operate in a single-turn stimulus-response paradigm without agency. DODAI OS exhibits true autonomous agency:
+VOID AI meets every criterion of the Agentic AI definition. Conventional chatbots operate in a single-turn stimulus-response paradigm without agency. VOID AI exhibits true autonomous agency:
 - Perception: Listens continuously via local Vosk/Whisper and monitors OS state.
 - Deliberation: Supervisor and Planner analyze open-ended goals and generate structured multi-step DAG plans.
 - Delegation: Dynamically selects specialized agents with bounded capabilities.
@@ -85,19 +85,19 @@ DODAI OS meets every criterion of the Agentic AI definition. Conventional chatbo
 
 --------------------------------------------------------------------------------
 G. REAL-WORLD PROBLEM IT SOLVES:
-Eliminates the cognitive friction and manual fragmentation of Linux desktop productivity. Modern engineers and knowledge workers waste 20-30% of their workday on repetitive operations: diagnosing memory leaks, checking network ports, organizing files, converting research into structured reports, scaffolding repetitive boilerplate, and toggling windows. DODAI OS acts as a 24/7 private, local autonomous partner that executes these multi-step workflows end-to-end with verified ground truth—saving hours daily while keeping confidential data 100% on the user's machine.
+Eliminates the cognitive friction and manual fragmentation of Linux desktop productivity. Modern engineers and knowledge workers waste 20-30% of their workday on repetitive operations: diagnosing memory leaks, checking network ports, organizing files, converting research into structured reports, scaffolding repetitive boilerplate, and toggling windows. VOID AI acts as a 24/7 private, local autonomous partner that executes these multi-step workflows end-to-end with verified ground truth—saving hours daily while keeping confidential data 100% on the user's machine.
 ================================================================================
 """
-    out_file = OUT_DIR / "DODAI_OS_Project_Abstract.txt"
+    out_file = OUT_DIR / "VOID_AI_Project_Abstract.txt"
     out_file.write_text(content.strip(), encoding="utf-8")
     print(f"Generated: {out_file}")
 
 # -----------------------------------------------------------------------------
-# 2. GENERATE DODAI_OS_Submission_Checklist.md
+# 2. GENERATE VOID_AI_Submission_Checklist.md
 # -----------------------------------------------------------------------------
 def generate_submission_checklist():
-    content = """# DODAI OS — Intel Digital Readiness Bootcamp 2026 Submission Checklist
-**Project:** DODAI OS – Agentic Linux AI Assistant  
+    content = """# VOID AI — Intel Digital Readiness Bootcamp 2026 Submission Checklist
+**Project:** VOID AI – Agentic Linux AI Assistant  
 **Event:** Intel AI for Future Workforce – Agentic AI Bootcamp 2026  
 **Submission Deadline:** November 22, 2026  
 **Platform:** Fedora Linux 40+ / KDE Plasma 6 / AMD Ryzen 7 / 16 GB RAM  
@@ -109,16 +109,16 @@ def generate_submission_checklist():
 
 | Deliverable Name | File Format | Location / Status | Description |
 | :--- | :---: | :---: | :--- |
-| **Comprehensive Project Report (PDF)** | `.pdf` | `DODAI_OS_Project_Report.pdf` | Complete 27-chapter master engineering report with diagrams and tables |
-| **Comprehensive Project Report (Word)** | `.docx` | `DODAI_OS_Project_Report.docx` | Publication-grade editable Microsoft Word edition |
-| **Executive Summary Dossier** | `.pdf` | `DODAI_OS_Executive_Summary.pdf` | Concise summary, abstract, 5 innovations, 5 agentic capabilities |
-| **Project Abstract & Form Copy** | `.txt` | `DODAI_OS_Project_Abstract.txt` | Clean plaintext for direct pasting into Google Submission Forms |
-| **Model & Function Documentation** | `.pdf` | `DODAI_OS_Model_and_Function_Documentation.pdf` | Technical mapping of all local, cloud, STT, TTS, and tool execution models |
-| **System Architecture Diagram** | `.png` | `DODAI_OS_System_Architecture.png` | 300 DPI high-resolution architecture diagram |
-| **Agent Workflow & DAG Diagram** | `.png` | `DODAI_OS_Agent_Workflow.png` | 300 DPI high-resolution agent lifecycle and verification cycle diagram |
-| **Project Presentation Slides** | `.pptx` | `DODAI_OS_Project_Deck.pptx` | 12-slide jury-ready PowerPoint deck |
-| **Presentation Script & Content** | `.md` | `DODAI_OS_Presentation_Content.md` | Complete speaker notes and visual cues |
-| **Submission Verification Checklist** | `.md` | `DODAI_OS_Submission_Checklist.md` | This verification and readiness audit checklist |
+| **Comprehensive Project Report (PDF)** | `.pdf` | `VOID_AI_Project_Report.pdf` | Complete 27-chapter master engineering report with diagrams and tables |
+| **Comprehensive Project Report (Word)** | `.docx` | `VOID_AI_Project_Report.docx` | Publication-grade editable Microsoft Word edition |
+| **Executive Summary Dossier** | `.pdf` | `VOID_AI_Executive_Summary.pdf` | Concise summary, abstract, 5 innovations, 5 agentic capabilities |
+| **Project Abstract & Form Copy** | `.txt` | `VOID_AI_Project_Abstract.txt` | Clean plaintext for direct pasting into Google Submission Forms |
+| **Model & Function Documentation** | `.pdf` | `VOID_AI_Model_and_Function_Documentation.pdf` | Technical mapping of all local, cloud, STT, TTS, and tool execution models |
+| **System Architecture Diagram** | `.png` | `VOID_AI_System_Architecture.png` | 300 DPI high-resolution architecture diagram |
+| **Agent Workflow & DAG Diagram** | `.png` | `VOID_AI_Agent_Workflow.png` | 300 DPI high-resolution agent lifecycle and verification cycle diagram |
+| **Project Presentation Slides** | `.pptx` | `VOID_AI_Project_Deck.pptx` | 12-slide jury-ready PowerPoint deck |
+| **Presentation Script & Content** | `.md` | `VOID_AI_Presentation_Content.md` | Complete speaker notes and visual cues |
+| **Submission Verification Checklist** | `.md` | `VOID_AI_Submission_Checklist.md` | This verification and readiness audit checklist |
 
 ---
 
@@ -149,12 +149,12 @@ def generate_submission_checklist():
 
 ## 4. Agentic AI Compliance Matrix
 
-| Intel Agentic AI Evaluation Criteria | DODAI OS Architectural Implementation | Verification Evidence |
+| Intel Agentic AI Evaluation Criteria | VOID AI Architectural Implementation | Verification Evidence |
 | :--- | :--- | :--- |
 | **Autonomous Goal Understanding** | Supervisor Agent classifies intent and extracts constraints | Verified via `agentic/supervisor.py` & Section 12 Section 0 |
 | **Task Decomposition & Planning** | Planner Agent constructs Directed Acyclic Graphs (DAG) | Verified in `agentic/planner.py` & `test_multi_agent_system.py` |
 | **Dynamic Multi-Agent Coordination** | 7 specialized agents (Linux, Dev, Research, Tool, Verifier, Recovery) | Verified in `agentic/agents/*.py` |
-| **Real Tool & System Execution** | Direct interaction with 105 Dodaios native tools, DBus, and Linux `/proc` | Verified via `agentic/tools.py` |
+| **Real Tool & System Execution** | Direct interaction with 105 VOID AI native tools, DBus, and Linux `/proc` | Verified via `agentic/tools.py` |
 | **Independent Verification Gate** | Independent Verifier Agent inspects exit codes, artifacts, unit tests | Verified via `agentic/agents/verifier_agent.py` |
 | **Self-Healing & Error Recovery** | Recovery Agent analyzes failures and formulates alternative plans (max 2 retries) | Verified via `agentic/agents/recovery_agent.py` |
 | **Persistent Memory & Context** | 7-day rolling memory pool (168 hours) across 1.5GB NVMe ring buffer | Verified via `agentic/memory.py` |
@@ -165,28 +165,28 @@ def generate_submission_checklist():
 
 ## 5. Submission Readiness Sign-Off
 
-- [x] All 10 requested submission deliverables compiled and placed in `DODAI_OS_INTEL_BOOTCAMP_SUBMISSION/`.
+- [x] All 10 requested submission deliverables compiled and placed in `VOID_AI_INTEL_BOOTCAMP_SUBMISSION/`.
 - [x] Every technical claim verified against ground-truth source code and hardware benchmarks.
 - [x] No simulated or fabricated test data; all 135 tests verified.
 - [x] Diagrams formatted in 300 DPI high-resolution for projector and print review.
 - [x] Ready for submission before November 22, 2026.
 """
-    out_file = OUT_DIR / "DODAI_OS_Submission_Checklist.md"
+    out_file = OUT_DIR / "VOID_AI_Submission_Checklist.md"
     out_file.write_text(content.strip(), encoding="utf-8")
     print(f"Generated: {out_file}")
 
 # -----------------------------------------------------------------------------
-# 3. GENERATE DODAI_OS_Presentation_Content.md
+# 3. GENERATE VOID_AI_Presentation_Content.md
 # -----------------------------------------------------------------------------
 def generate_presentation_content():
-    content = """# DODAI OS — Official Project Presentation Deck Script
+    content = """# VOID AI — Official Project Presentation Deck Script
 **Submission:** Intel Digital Readiness – AI for Future Workforce Agentic AI Bootcamp 2026  
 **Format:** 12 Jury-Readable Slides with Complete Visual Recommendations and Speaker Notes  
 
 ---
 
 ## Slide 1: Title & Vision
-- **Header:** DODAI OS: Agentic Linux AI Assistant
+- **Header:** VOID AI: Agentic Linux AI Assistant
 - **Subtitle:** Your Local Autonomous Linux Intelligence
 - **Presenter / Team:** Prakash (`prakash2006-xl`)
 - **Event:** Intel Digital Readiness – AI for Future Workforce Agentic AI Bootcamp 2026
@@ -206,7 +206,7 @@ def generate_presentation_content():
 
 ---
 
-## Slide 3: Our Solution — DODAI OS
+## Slide 3: Our Solution — VOID AI
 - **Header:** An Autonomous Operating Layer for Linux
 - **Bullet Points:**
   - **Local-First & Private:** 100% offline-capable on AMD Ryzen 7 with zero mandatory cloud telemetry.
@@ -218,10 +218,10 @@ def generate_presentation_content():
 
 ---
 
-## Slide 4: Why DODAI OS is Genuine Agentic AI
+## Slide 4: Why VOID AI is Genuine Agentic AI
 - **Header:** The Agentic AI Difference Matrix
 - **Comparison Table:**
-  | Dimension | Conventional Chatbot | Typical AI Assistant | DODAI OS (Agentic AI) |
+  | Dimension | Conventional Chatbot | Typical AI Assistant | VOID AI (Agentic AI) |
   | :--- | :--- | :--- | :--- |
   | **Core Paradigm** | Single-turn text generation | Voice search wrapper | Multi-Step DAG Task Execution |
   | **Tool Access** | Zero tool execution | Static web API calls | 105 Native Linux Tools + DBus |
@@ -239,7 +239,7 @@ def generate_presentation_content():
   - **Tier 2 (Hierarchical DAG Core):** Supervisor classifies intent; Planner constructs dynamic task dependencies.
   - **Perception Layer:** Vosk real-time Kaldi FST wake recognition + Faster-Whisper int8 STT.
   - **Cognitive Layer:** Ultra-lite local `nano-brain` (370M LoRA) + `lfm3-omni:2b` + Cloud bridge.
-- **Visual:** High-resolution diagram (`DODAI_OS_System_Architecture.png`).
+- **Visual:** High-resolution diagram (`VOID_AI_System_Architecture.png`).
 
 ---
 
@@ -251,7 +251,7 @@ def generate_presentation_content():
   3. **Linux Intelligence Agent:** Direct telemetry of `/proc`, CPU loads, memory, disks, and active network ports.
   4. **Developer Agent:** Automated project scaffolding, code writing, and unit test execution in sandbox.
   5. **Research Agent:** Multi-facet web intelligence gathering and structured document synthesis.
-  6. **Tool Execution Agent:** Safe interaction with 105 Dodaios native desktop tools.
+  6. **Tool Execution Agent:** Safe interaction with 105 VOID AI native desktop tools.
   7. **Verifier & Recovery Agents:** Ground-truth certification and bounded self-healing.
 - **Visual:** Agent role cards with input/output communication flow.
 
@@ -323,15 +323,15 @@ def generate_presentation_content():
   - Integration with Intel OpenVINO for NPU-accelerated neural inference on Intel Core Ultra.
   - Multi-agent swarm expansion with distributed peer-to-peer task offloading.
   - Native Wayland screen vision & multimodal document parsing.
-- **Closing Statement:** DODAI OS proves that personal AI can be autonomous, verified, private, and blazingly fast on Linux personal computers.
+- **Closing Statement:** VOID AI proves that personal AI can be autonomous, verified, private, and blazingly fast on Linux personal computers.
 - **Contact:** `https://github.com/prakash2006-xl/VOID-.git`
 """
-    out_file = OUT_DIR / "DODAI_OS_Presentation_Content.md"
+    out_file = OUT_DIR / "VOID_AI_Presentation_Content.md"
     out_file.write_text(content.strip(), encoding="utf-8")
     print(f"Generated: {out_file}")
 
 # -----------------------------------------------------------------------------
-# 4. GENERATE DODAI_OS_Project_Deck.pptx (via python-pptx)
+# 4. GENERATE VOID_AI_Project_Deck.pptx (via python-pptx)
 # -----------------------------------------------------------------------------
 def generate_project_deck_pptx():
     try:
@@ -360,7 +360,7 @@ def generate_project_deck_pptx():
     slides_data = [
         # Slide 1: Title
         {
-            "title": "DODAI OS: Agentic Linux AI Assistant",
+            "title": "VOID AI: Agentic Linux AI Assistant",
             "subtitle": "Your Local Autonomous Linux Intelligence • Intel Bootcamp 2026",
             "bullets": [
                 "Presenter / System Architect: Prakash (prakash2006-xl)",
@@ -384,7 +384,7 @@ def generate_project_deck_pptx():
         },
         # Slide 3: Proposed Solution
         {
-            "title": "Our Solution: DODAI OS Autonomous Operating Layer",
+            "title": "Our Solution: VOID AI Autonomous Operating Layer",
             "subtitle": "Local-First Multi-Agent Architecture for Fedora Linux",
             "bullets": [
                 "Local-First & Edge-Ready: 100% offline-capable on CPU with zero mandatory cloud telemetry.",
@@ -397,7 +397,7 @@ def generate_project_deck_pptx():
         },
         # Slide 4: Agentic Comparison
         {
-            "title": "Why DODAI OS is Genuine Agentic AI",
+            "title": "Why VOID AI is Genuine Agentic AI",
             "subtitle": "Key Architectural Differentiators from Conventional Chatbots",
             "bullets": [
                 "Multi-Step DAG Planning: Decomposes complex user goals into dependency-ordered execution graphs.",
@@ -416,8 +416,8 @@ def generate_project_deck_pptx():
                 "Perception Layer: Vosk Kaldi Real-Time Wake FST ('hey void') + Faster-Whisper Base int8 STT.",
                 "Dual-Tier Router: Sub-5ms DBus dispatch for window/volume controls + Supervisor agent routing.",
                 "Cognitive Engine: Ultra-lite nano-brain (370M LoRA, <150MB RAM) + lfm3-omni:2b + Cloud bridge.",
-                "Tool Framework: 105 Dodaios native tools, KWin Wayland DBus, and sandboxed project workspaces.",
-                "Visual Diagram: Refer to DODAI_OS_System_Architecture.png in submission package."
+                "Tool Framework: 105 VOID AI native tools, KWin Wayland DBus, and sandboxed project workspaces.",
+                "Visual Diagram: Refer to VOID_AI_System_Architecture.png in submission package."
             ],
             "accent": CYAN
         },
@@ -504,7 +504,7 @@ def generate_project_deck_pptx():
         # Slide 12: Conclusion & Future Scope
         {
             "title": "Conclusion & Future Roadmap",
-            "subtitle": "DODAI OS: Your Local Autonomous Linux Intelligence",
+            "subtitle": "VOID AI: Your Local Autonomous Linux Intelligence",
             "bullets": [
                 "Future Roadmap: Intel OpenVINO NPU acceleration on Core Ultra, multi-agent swarm expansion.",
                 "Proven Viability: Ready, tested, and demonstrated for Intel Digital Readiness Bootcamp 2026.",
@@ -570,12 +570,12 @@ def generate_project_deck_pptx():
         footer_box = slide.shapes.add_textbox(Inches(0.8), Inches(6.9), Inches(11.733), Inches(0.4))
         f_tf = footer_box.text_frame
         p_f = f_tf.paragraphs[0]
-        p_f.text = f"DODAI OS • Intel AI for Future Workforce Bootcamp 2026 • Slide {s_idx + 1} of {len(slides_data)}"
+        p_f.text = f"VOID AI • Intel AI for Future Workforce Bootcamp 2026 • Slide {s_idx + 1} of {len(slides_data)}"
         p_f.font.size = Pt(9)
         p_f.font.color.rgb = GRAY
         p_f.alignment = PP_ALIGN.RIGHT
 
-    out_file = OUT_DIR / "DODAI_OS_Project_Deck.pptx"
+    out_file = OUT_DIR / "VOID_AI_Project_Deck.pptx"
     prs.save(out_file)
     print(f"Generated: {out_file}")
 
