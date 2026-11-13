@@ -20,4 +20,6 @@ memory/
 test_pill_crop.png
 config/ai_providers.json
 config/.void_launcher.json
+VOID_AI_PRODUCT_DEMO/temp/
+
 
