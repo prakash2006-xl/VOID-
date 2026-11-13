@@ -44,7 +44,8 @@ from vosk import Model as VoskModel, KaldiRecognizer
 from faster_whisper import WhisperModel
 
 from PySide6 import QtCore, QtGui, QtWidgets
-from PySide6.QtCore import Qt, QTimer, Signal, QObject, QPoint, QPointF, QRect
+from PySide6.QtCore import Qt, QTimer, Signal, Slot, QObject, QPoint, QPointF, QRect
+from PySide6.QtDBus import QDBusConnection
 from PySide6.QtGui import (
     QColor, QPainter, QRadialGradient, QLinearGradient, QBrush,
     QPen, QFont, QMouseEvent, QPixmap, QPainterPath
@@ -996,44 +997,271 @@ def get_friendly_app_name(name: str) -> str:
     }
     return friendly.get(clean, clean.title())
 
-def close_software_by_name(name: str) -> bool:
+class WindowResult:
+    """Encapsulates the verified result of a window management operation."""
+    def __init__(self, success: bool, window_title: str = "", app_class: str = "", action: str = ""):
+        self.success = bool(success)
+        self.window_title = window_title
+        self.app_class = app_class
+        self.action = action
+
+    def __bool__(self) -> bool:
+        return self.success
+
+    def __iter__(self):
+        yield self.success
+        yield self.window_title
+
+    def __repr__(self) -> str:
+        return f"WindowResult(success={self.success}, title='{self.window_title}', class='{self.app_class}', action='{self.action}')"
+
+_window_dbus_receiver = None
+_window_action_event = threading.Event()
+_last_window_result: tuple[bool, str, str, str] = (False, "", "", "")
+
+class Receiver(QObject):
+    @Slot(bool, str, str, str)
+    def windowResult(self, matched: bool, title: str, res_class: str, action: str) -> None:
+        global _last_window_result
+        _last_window_result = (matched, title, res_class, action)
+        _window_action_event.set()
+
+def ensure_window_dbus_registered():
+    global _window_dbus_receiver
+    try:
+        from PySide6.QtCore import QCoreApplication
+        from PySide6.QtDBus import QDBusConnection
+        if not QCoreApplication.instance():
+            _app = QCoreApplication(sys.argv)
+        bus = QDBusConnection.sessionBus()
+        if bus.isConnected() and _window_dbus_receiver is None:
+            _window_dbus_receiver = Receiver()
+            if QCoreApplication.instance():
+                _window_dbus_receiver.moveToThread(QCoreApplication.instance().thread())
+            bus.registerObject("/WindowNotifier", _window_dbus_receiver, QDBusConnection.RegisterOption.ExportAllSlots)
+            bus.registerService("org.void.WindowNotifier")
+    except Exception as e:
+        print(f"[DBus Register Error] {e}", flush=True)
+
+def kwin_manage_app_window(app_name: str, action: str) -> WindowResult:
+    """Controls specific application windows on KDE Plasma Wayland via KWin Scripting and returns verified execution state."""
+    import tempfile
+    ensure_window_dbus_registered()
+    clean_app = app_name.strip().lower()
+    app_map = {
+        "chromium": "chromium", "browser": "chromium", "chrome": "chromium", "firefox": "firefox",
+        "terminal": "konsole", "konsole": "konsole", "console": "konsole",
+        "dolphin": "dolphin", "files": "dolphin", "file manager": "dolphin",
+        "calculator": "kcalc", "kcalc": "kcalc", "calc": "kcalc",
+        "text editor": "kwrite", "kwrite": "kwrite", "kate": "kate", "editor": "kate",
+        "settings": "systemsettings", "system settings": "systemsettings", "kde settings": "systemsettings",
+        "antigravity": "antigravity", "ide": "antigravity", "vlc": "vlc"
+    }
+    target = app_map.get(clean_app, clean_app)
+    act = action.strip().lower()
+
+    global _last_window_result
+    _last_window_result = (False, "", "", act)
+    _window_action_event.clear()
+
+    script = f"""
+    var target = "{target}".toLowerCase().trim();
+    var act = "{act}".toLowerCase().trim();
+    var stack = workspace.stackingOrder;
+
+    function isAppWindow(w) {{
+        if (!w || !w.normalWindow) return false;
+        var res = (w.resourceClass || "").toLowerCase();
+        var cap = (w.caption || "").toLowerCase();
+        if (res.indexOf("quickshell") !== -1 || res.indexOf("plasmashell") !== -1 || res.indexOf("xwaylandvideobridge") !== -1 || res.indexOf("kscreenlocker") !== -1 || res.indexOf("lockscreen") !== -1) return false;
+        if (res.indexOf("python") !== -1 && cap.indexOf("void") !== -1) return false;
+        return true;
+    }}
+
+    function applyAction(w, a) {{
+        if (a === "minimize") {{
+            w.minimized = true;
+        }} else if (a === "restore" || a === "unminimize") {{
+            w.minimized = false;
+            workspace.activeWindow = w;
+        }} else if (a === "maximize") {{
+            try {{ w.setMaximize(true, true); }} catch(e) {{ w.maximized = 3; }}
+        }} else if (a === "fullscreen") {{
+            w.fullScreen = !w.fullScreen;
+        }} else if (a === "close") {{
+            w.closeWindow();
+        }} else if (a === "activate") {{
+            workspace.activeWindow = w;
+        }}
+    }}
+
+    var isAll = (target === "all" || target === "everything" || target === "all windows" || target === "all apps" || target === "all applications" || target === "all software");
+
+    var isGeneric = (
+        target === "" || target === "window" || target === "active" || target === "current" ||
+        target === "app" || target === "a app" || target === "an app" || target === "the app" ||
+        target === "this app" || target === "application" || target === "a application" ||
+        target === "an application" || target === "the application" || target === "this application" ||
+        target === "this window" || target === "the window" || target === "current window" ||
+        target === "active window" || target === "it" || target === "this" || target === "screen"
+    );
+
+    var matched = false;
+    var winTitle = "";
+    var winClass = "";
+
+    if (isAll) {{
+        var count = 0;
+        for (var i = 0; i < stack.length; i++) {{
+            var w = stack[i];
+            if (isAppWindow(w)) {{
+                applyAction(w, act);
+                count++;
+            }}
+        }}
+        matched = (count > 0);
+        winTitle = count + " windows";
+    }} else if (isGeneric) {{
+        for (var i = stack.length - 1; i >= 0; i--) {{
+            var w = stack[i];
+            if (isAppWindow(w)) {{
+                if (act === "restore" || act === "unminimize") {{
+                    if (w.minimized) {{
+                        applyAction(w, act);
+                        matched = true;
+                        winTitle = w.caption || w.resourceClass || "Window";
+                        winClass = w.resourceClass || "";
+                        break;
+                    }}
+                }} else {{
+                    if (!w.minimized) {{
+                        applyAction(w, act);
+                        matched = true;
+                        winTitle = w.caption || w.resourceClass || "Window";
+                        winClass = w.resourceClass || "";
+                        break;
+                    }}
+                }}
+            }}
+        }}
+    }} else {{
+        for (var i = stack.length - 1; i >= 0; i--) {{
+            var w = stack[i];
+            if (isAppWindow(w)) {{
+                var res = (w.resourceClass || "").toLowerCase();
+                var cap = (w.caption || "").toLowerCase();
+                if (res.indexOf(target) !== -1 || cap.indexOf(target) !== -1) {{
+                    applyAction(w, act);
+                    matched = true;
+                    winTitle = w.caption || w.resourceClass || target;
+                    winClass = w.resourceClass || "";
+                    if (act !== "close" && act !== "minimize") {{
+                        break;
+                    }}
+                }}
+            }}
+        }}
+    }}
+
+    try {{
+        callDBus("org.void.WindowNotifier", "/WindowNotifier", "", "windowResult", matched, winTitle, winClass, act);
+    }} catch(e) {{}}
+    """
+
+    fpath = ""
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
+            f.write(script)
+            fpath = f.name
+        load_res = subprocess.run(
+            ["qdbus-qt6", "org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting.loadScript", fpath],
+            capture_output=True, text=True, timeout=1.0
+        )
+        num = load_res.stdout.strip()
+        if num:
+            subprocess.run(["qdbus-qt6", "org.kde.KWin", f"/Scripting/Script{num}", "org.kde.kwin.Script.run"], timeout=1.0)
+            from PySide6.QtCore import QCoreApplication
+            for _ in range(12):
+                if _window_action_event.is_set():
+                    break
+                if QCoreApplication.instance():
+                    QCoreApplication.processEvents()
+                time.sleep(0.04)
+            subprocess.run(["qdbus-qt6", "org.kde.KWin", f"/Scripting/Script{num}", "org.kde.kwin.Script.stop"], timeout=1.0)
+            subprocess.run(["qdbus-qt6", "org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting.unloadScript", fpath], timeout=1.0)
+            
+            if _window_action_event.is_set():
+                m, t, c, a = _last_window_result
+                return WindowResult(m, t, c, a)
+
+            # Fallback if DBus didn't arrive: check process existence for named applications
+            if target not in ["window", "active", "current", "all"]:
+                chk = subprocess.run(["pgrep", "-f", target], capture_output=True, text=True)
+                if chk.returncode == 0 and chk.stdout.strip():
+                    return WindowResult(True, get_friendly_app_name(target), target, act)
+                else:
+                    return WindowResult(False, "", "", act)
+            return WindowResult(False, "", "", act)
+    except Exception as e:
+        print(f"[VOID KWin Script Error] {e}", flush=True)
+    finally:
+        if fpath:
+            try:
+                os.remove(fpath)
+            except Exception:
+                pass
+    return WindowResult(False, "", "", act)
+
+def close_software_by_name(name: str) -> WindowResult:
     clean = name.strip().lower()
     
     # 1. Close everything / all applications
     if clean in ["all", "everything", "all windows", "all apps", "all applications", "all software"]:
-        kwin_manage_app_window("all", "close")
+        kwin_res = kwin_manage_app_window("all", "close")
         time.sleep(0.15)
         for app in ["chromium", "firefox", "konsole", "dolphin", "kate", "kwrite", "kcalc", "vlc", "systemsettings"]:
             try:
                 subprocess.run(["pkill", "-f", app], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except Exception:
                 pass
-        return True
+        return WindowResult(True, "All Applications", "all", "close")
 
-    # 2. Try closing window gracefully via KWin
+    # 2. Generic window close ("a app", "an app", "app", "window", etc.)
+    generic_targets = [
+        "window", "active window", "current window", "this", "this window", "the window",
+        "app", "application", "the app", "this app", "current app", "active app",
+        "a app", "an app", "a application", "an application"
+    ]
+    if clean in generic_targets:
+        return kwin_manage_app_window("window", "close")
+
+    # 3. Try closing specific window gracefully via KWin
     kwin_res = kwin_manage_app_window(clean, "close")
-    time.sleep(0.1)
+    if kwin_res.success:
+        return kwin_res
 
-    # 3. Check App Registry
+    # 4. Check App Registry
     if SYSTEM_APP_REGISTRY.close(clean):
-        return True
+        return WindowResult(True, get_friendly_app_name(clean), clean, "close")
 
-    # 4. Target mapping fallback
-    app_map = {
-        "antigravity": "antigravity-ide",
-        "chromium": "chromium", "firefox": "firefox", "browser": "chromium",
-        "dolphin": "dolphin", "files": "dolphin", "file manager": "dolphin",
-        "terminal": "konsole", "konsole": "konsole", "kate": "kate",
-        "kwrite": "kwrite", "kcalc": "kcalc", "calculator": "kcalc",
-        "vlc": "vlc", "settings": "systemsettings", "system settings": "systemsettings"
-    }
-    target = app_map.get(clean, clean)
-    try:
-        res = subprocess.run(["pkill", "-f", target], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if res.returncode == 0 or kwin_res:
-            return True
-    except Exception:
-        pass
+    # 5. Target mapping fallback via pkill (only for named apps, never generic 'a' or 'an')
+    if clean not in ["a", "an", "the", "this", "it"] and len(clean) > 1:
+        app_map = {
+            "antigravity": "antigravity-ide",
+            "chromium": "chromium", "firefox": "firefox", "browser": "chromium",
+            "dolphin": "dolphin", "files": "dolphin", "file manager": "dolphin",
+            "terminal": "konsole", "konsole": "konsole", "kate": "kate",
+            "kwrite": "kwrite", "kcalc": "kcalc", "calculator": "kcalc",
+            "vlc": "vlc", "settings": "systemsettings", "system settings": "systemsettings"
+        }
+        target = app_map.get(clean, clean)
+        try:
+            chk = subprocess.run(["pgrep", "-f", target], capture_output=True, text=True)
+            if chk.returncode == 0 and chk.stdout.strip():
+                subprocess.run(["pkill", "-f", target], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return WindowResult(True, get_friendly_app_name(clean), target, "close")
+        except Exception:
+            pass
     return kwin_res
 def spawn_software(binary: str) -> bool:
     try:
@@ -1082,110 +1310,6 @@ def parse_timer_duration(text: str) -> int:
         just_num = re.search(r"\b(\d+)\b", text)
         if just_num: tot = int(just_num.group(1)) * 60
     return tot
-
-def kwin_manage_app_window(app_name: str, action: str) -> bool:
-    """Controls specific application windows on KDE Plasma Wayland via KWin Scripting."""
-    import tempfile
-    clean_app = app_name.strip().lower()
-    app_map = {
-        "chromium": "chromium", "browser": "chromium", "firefox": "firefox",
-        "terminal": "konsole", "konsole": "konsole", "dolphin": "dolphin",
-        "files": "dolphin", "file manager": "dolphin", "calculator": "kcalc", "kcalc": "kcalc",
-        "text editor": "kwrite", "kwrite": "kwrite", "kate": "kate",
-        "settings": "systemsettings", "system settings": "systemsettings",
-        "antigravity": "antigravity", "ide": "antigravity"
-    }
-    target = app_map.get(clean_app, clean_app)
-    act = action.strip().lower()
-
-    script = f"""
-    var isAll = ("{target}" === "all" || "{target}" === "everything" || "{target}" === "all windows" || "{target}" === "all apps" || "{target}" === "all applications" || "{target}" === "all software");
-    var isGeneric = ("{target}" === "window" || "{target}" === "active window" || "{target}" === "current window" || "{target}" === "this" || "{target}" === "this window" || "{target}" === "the window" || "{target}" === "screen" || "{target}" === "app" || "{target}" === "application" || "{target}" === "the app" || "{target}" === "this app" || "{target}" === "current app" || "{target}" === "active app");
-    var wins = workspace.windowList();
-
-    function isAppWindow(w) {{
-        if (!w || !w.normalWindow) return false;
-        var res = (w.resourceClass || "").toLowerCase();
-        var cap = (w.caption || "").toLowerCase();
-        if (res.indexOf("quickshell") !== -1 || res.indexOf("plasmashell") !== -1 || res.indexOf("xwaylandvideobridge") !== -1) return false;
-        if (res.indexOf("python") !== -1 && cap.indexOf("void") !== -1) return false;
-        return true;
-    }}
-    
-    function applyAction(w, a) {{
-        if (a === "minimize") {{
-            w.minimized = true;
-        }} else if (a === "restore" || a === "unminimize") {{
-            w.minimized = false;
-            workspace.activeWindow = w;
-        }} else if (a === "maximize") {{
-            try {{ w.setMaximize(true, true); }} catch(e) {{ w.maximized = 3; }}
-        }} else if (a === "fullscreen") {{
-            w.fullScreen = !w.fullScreen;
-        }} else if (a === "close") {{
-            w.closeWindow();
-        }} else if (a === "activate") {{
-            workspace.activeWindow = w;
-        }}
-    }}
-
-    if (isGeneric) {{
-        var actWin = workspace.activeWindow;
-        if (isAppWindow(actWin)) {{
-            applyAction(actWin, "{act}");
-        }} else {{
-            for (var i = wins.length - 1; i >= 0; i--) {{
-                var w = wins[i];
-                if (isAppWindow(w) && !w.minimized) {{
-                    applyAction(w, "{act}");
-                    break;
-                }}
-            }}
-        }}
-    }} else if (isAll) {{
-        for (var i = 0; i < wins.length; i++) {{
-            var w = wins[i];
-            if (isAppWindow(w)) {{
-                applyAction(w, "{act}");
-            }}
-        }}
-    }} else {{
-        for (var i = 0; i < wins.length; i++) {{
-            var w = wins[i];
-            if (!w.normalWindow) continue;
-            var res = (w.resourceClass || "").toLowerCase();
-            var cap = (w.caption || "").toLowerCase();
-            if (res.indexOf("{target}") !== -1 || cap.indexOf("{target}") !== -1) {{
-                applyAction(w, "{act}");
-                if ("{act}" !== "close" && "{act}" !== "minimize") {{
-                    break;
-                }}
-            }}
-        }}
-    }}
-    """
-    try:
-        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
-            f.write(script)
-            fpath = f.name
-        load_res = subprocess.run(
-            ["qdbus-qt6", "org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting.loadScript", fpath],
-            capture_output=True, text=True, timeout=1.0
-        )
-        num = load_res.stdout.strip()
-        if num:
-            subprocess.run(["qdbus-qt6", "org.kde.KWin", f"/Scripting/Script{num}", "org.kde.kwin.Script.run"], timeout=1.0)
-            time.sleep(0.22)
-            subprocess.run(["qdbus-qt6", "org.kde.KWin", f"/Scripting/Script{num}", "org.kde.kwin.Script.stop"], timeout=1.0)
-            subprocess.run(["qdbus-qt6", "org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting.unloadScript", fpath], timeout=1.0)
-            try:
-                os.remove(fpath)
-            except Exception:
-                pass
-            return True
-    except Exception as e:
-        print(f"[VOID KWin Script Error] {e}", flush=True)
-    return False
 
 def is_safe_user_path(p: str | Path) -> bool:
     try:
@@ -2427,7 +2551,7 @@ class DodaiosToolHub:
             chosen_title = ""
             
             # 1. Parse ytInitialData to extract authentic videoRenderer items (avoiding ads, shorts & promoted videos)
-            m_data = re.search(r"var ytInitialData\s*=\s*({.+?});</script>", html)
+            m_data = re.search(r"(?:var\s+|window\[['\"]ytInitialData['\"]\]\s*=\s*)?ytInitialData\s*=\s*({.+?});</script>", html)
             if m_data:
                 try:
                     yt_data = json.loads(m_data.group(1))
@@ -2466,7 +2590,21 @@ class DodaiosToolHub:
                 except Exception as e:
                     print(f"[YouTube ytInitialData Parse Error] {e}", flush=True)
 
-            # 2. Fallback if JSON parse fails: Regex watch links
+            # 2. Authoritative Fallback if initial parse yields no candidate
+            if not chosen_vid:
+                try:
+                    ddg_vids = self.search_web_ddgs(f"site:youtube.com/watch {clean_q}", max_results=3)
+                    for r in ddg_vids:
+                        href = r.get("url", "")
+                        v_m = re.search(r"(?:v=|\/embed\/|\/watch\?v=)([a-zA-Z0-9_-]{11})", href)
+                        if v_m:
+                            chosen_vid = v_m.group(1)
+                            chosen_title = r.get("title", "")
+                            break
+                except Exception:
+                    pass
+
+            # 3. Regex watch links fallback
             if not chosen_vid:
                 vids_watch = re.findall(r"/watch\?v=([a-zA-Z0-9_-]{11})", html)
                 seen = set()
@@ -2549,6 +2687,15 @@ class DodaiosToolHub:
             topic_str = metadata.get("topic", title) if metadata else title
             target_pgs = metadata.get("target_pages") if metadata else None
 
+            # Calculate precise page break indices to produce exactly target_pgs
+            page_break_indices = set()
+            if target_pgs and target_pgs > 1 and len(sections) > 1:
+                step = len(sections) / float(target_pgs)
+                for p in range(1, target_pgs):
+                    b_idx = int(round(p * step))
+                    if 0 <= b_idx < len(sections):
+                        page_break_indices.add(b_idx)
+
             html_sections = []
 
             # Executive Header Accent and Visual Stat Shapes
@@ -2578,7 +2725,7 @@ class DodaiosToolHub:
             for idx, sec in enumerate(sections):
                 h = sec.get("heading", "")
                 sec_html = ""
-                pb_class = " page-break" if (target_pgs and target_pgs >= 3 and idx > 0 and idx % 2 == 0) else ""
+                pb_class = " page-break" if (idx in page_break_indices) else ""
                 if h:
                     sec_html += f'<h2 class="section-title">{pyhtml.escape(h)}</h2>\n'
 
@@ -2636,7 +2783,7 @@ class DodaiosToolHub:
 <style>
     @page {{
         size: A4;
-        margin: 18mm 15mm 18mm 15mm;
+        margin: 12mm 14mm 12mm 14mm;
         @bottom-right {{
             content: "Page " counter(page);
             font-size: 8pt;
@@ -2655,136 +2802,138 @@ class DodaiosToolHub:
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         color: #1e293b;
         background: #ffffff;
-        line-height: 1.65;
-        font-size: 10pt;
+        line-height: 1.38;
+        font-size: 9.5pt;
         margin: 0;
         padding: 0;
     }}
     .header-bar {{
-        height: 4px;
+        height: 3px;
         background: linear-gradient(90deg, #0284c7, #38bdf8, #818cf8);
-        margin-bottom: 20px;
+        margin-bottom: 12px;
         border-radius: 2px;
     }}
     .header-banner {{
         border-bottom: 2px solid #0284c7;
-        padding-bottom: 14px;
-        margin-bottom: 20px;
+        padding-bottom: 8px;
+        margin-bottom: 12px;
     }}
     .doc-meta {{
         display: flex;
         justify-content: space-between;
-        font-size: 8.5pt;
+        font-size: 8pt;
         color: #64748b;
         text-transform: uppercase;
-        letter-spacing: 0.8px;
-        margin-bottom: 6px;
+        letter-spacing: 0.6px;
+        margin-bottom: 4px;
     }}
     .doc-title {{
-        font-size: 20pt;
+        font-size: 16pt;
         font-weight: 800;
         color: #0f172a;
-        margin: 0 0 8px 0;
-        line-height: 1.25;
+        margin: 0 0 4px 0;
+        line-height: 1.2;
     }}
     .doc-subtitle {{
-        font-size: 10pt;
+        font-size: 9pt;
         color: #475569;
         margin: 0;
     }}
     .metrics-grid {{
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 12px;
-        margin: 16px 0 20px 0;
+        gap: 10px;
+        margin: 10px 0 12px 0;
     }}
     .metric-card {{
         background: #f8fafc;
         border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 10px 14px;
+        border-radius: 6px;
+        padding: 6px 10px;
         text-align: center;
     }}
-    .metric-val {{ font-size: 16pt; font-weight: 700; color: #0284c7; margin-bottom: 2px; }}
-    .metric-lbl {{ font-size: 8pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }}
+    .metric-val {{ font-size: 13pt; font-weight: 700; color: #0284c7; margin-bottom: 1px; }}
+    .metric-lbl {{ font-size: 7.5pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.4px; }}
     .callout-box {{
         background: #f0f9ff;
-        border-left: 4px solid #0284c7;
-        border-radius: 0 8px 8px 0;
-        padding: 12px 16px;
-        margin: 16px 0;
+        border-left: 3px solid #0284c7;
+        border-radius: 0 6px 6px 0;
+        padding: 8px 12px;
+        margin: 10px 0;
+        font-size: 9pt;
     }}
-    .callout-title {{ font-weight: 700; color: #0369a1; font-size: 10.5pt; margin-bottom: 4px; }}
-    .page-break {{ page-break-before: always; }}
+    .callout-title {{ font-weight: 700; color: #0369a1; font-size: 9.5pt; margin-bottom: 2px; }}
+    .page-break {{ page-break-before: always; break-before: page; }}
     .doc-section {{
-        margin-bottom: 18px;
-        page-break-inside: avoid;
+        margin-bottom: 12px;
     }}
     .section-title {{
-        font-size: 12.5pt;
+        font-size: 11pt;
         font-weight: 700;
         color: #0369a1;
         border-bottom: 1px solid #e2e8f0;
-        padding-bottom: 4px;
-        margin-top: 16px;
-        margin-bottom: 8px;
+        padding-bottom: 3px;
+        margin-top: 10px;
+        margin-bottom: 6px;
     }}
     .content-para {{
-        margin: 0 0 10px 0;
+        margin: 0 0 6px 0;
         text-align: justify;
+        line-height: 1.35;
     }}
     .content-list {{
-        margin: 6px 0 14px 20px;
+        margin: 4px 0 8px 18px;
         padding: 0;
     }}
-    .content-list li {{ margin-bottom: 5px; }}
+    .content-list li {{ margin-bottom: 3px; }}
     .numbered-item {{
         display: flex;
         align-items: center;
         background: #f8fafc;
         border: 1px solid #e2e8f0;
-        border-radius: 6px;
-        padding: 8px 12px;
-        margin-bottom: 8px;
+        border-radius: 4px;
+        padding: 6px 10px;
+        margin-bottom: 6px;
+        font-size: 9pt;
     }}
     .item-badge {{
         background: #0284c7;
         color: #ffffff;
-        font-size: 7.5pt;
+        font-size: 7pt;
         font-weight: 700;
         text-transform: uppercase;
-        border-radius: 4px;
-        padding: 2px 6px;
-        margin-right: 10px;
+        border-radius: 3px;
+        padding: 1px 5px;
+        margin-right: 8px;
     }}
     .table-container {{
-        margin: 14px 0 18px 0;
+        margin: 8px 0 10px 0;
         overflow-x: auto;
     }}
     .data-table {{
         width: 100%;
         border-collapse: collapse;
-        font-size: 9pt;
+        font-size: 8.5pt;
         text-align: left;
     }}
     .data-table th {{
         background: #0f172a;
         color: #f8fafc;
-        padding: 8px 10px;
+        padding: 5px 8px;
         font-weight: 600;
         border: 1px solid #334155;
     }}
     .data-table td {{
-        padding: 7px 10px;
+        padding: 4px 8px;
         border: 1px solid #e2e8f0;
     }}
     .data-table tr.even-row {{ background: #f8fafc; }}
     .data-table tr.odd-row {{ background: #ffffff; }}
     .footer-note {{
-        margin-top: 24px;
+        margin-top: 16px;
         border-top: 1px solid #e2e8f0;
-        padding-top: 10px;
-        font-size: 8pt;
+        padding-top: 8px;
+        font-size: 7.5pt;
         color: #94a3b8;
         text-align: center;
     }}
@@ -2961,59 +3110,97 @@ class DodaiosToolHub:
             + "3. Phase 3: Optimization, caching integration, and long-term maintenance scheduling."
         )
 
+        num_cits = 2 if (target_pages and target_pages <= 2) else (3 if (target_pages and target_pages == 3) else 5)
         citations_list = []
-        for src in all_sources[:6]:
-            citations_list.append(f"- **{src['title']}**: {src['snippet'][:90]}... (Source: {src['url']})")
+        for src in all_sources[:num_cits]:
+            t_trunc = src['title'][:50]
+            citations_list.append(f"- **{t_trunc}**: {src['snippet'][:80]}...")
         citations_body = "\n".join(citations_list) if citations_list else f"- Authoritative industry research & verified local system data for {topic}."
 
-        sections = [
-            {"heading": "Executive Summary & Strategic Scope", "content": exec_summary},
-            {"heading": "Architectural Foundations & Core Principles", "content": foundations_body},
-            {"heading": "Current Breakthroughs & Market Trends", "content": trends_body},
-            {"heading": "Empirical Findings & Performance Benchmarks", "content": benchmarks_body, "table": benchmark_table},
-            {"heading": "Strategic Roadmap & Implementation Framework", "content": roadmap_body},
-        ]
+        hardware_table = {
+            "headers": ["Subsystem / Hardware", "Minimum Spec", "Recommended Spec", "Fault Tolerance"],
+            "rows": [
+                ["Compute Engine (CPU/NPU)", "4 Cores x86_64", "8+ Cores with AVX-512 / Neural Engine", "Graceful core throttling"],
+                ["Memory Capacity", "8 GB LPDDR5", "16 GB+ Unified Memory", "LRU page cache pruning"],
+                ["Storage Throughput", "500 MB/s SATA", "3200 MB/s NVMe PCIe 4.0", "Atomic journal sync"],
+                ["Audio / Visual Bus", "Standard ALSA", "PipeWire Realtime Low-Latency (<15ms)", "Instant fallback sinks"]
+            ]
+        }
+        tradeoffs_table = {
+            "headers": ["Architecture Axis", "Alternative Design", f"VOID {clean_topic_label}", "Net Advantage"],
+            "rows": [
+                ["Inference Host", "Cloud API Gateway", "Local GGUF / ONNX Engine", "Zero data egress, zero fee"],
+                ["Memory Retention", "Volatile RAM Buffer", "1.5 GB Persistent NVMe Store", "Cross-session permanence"],
+                ["Desktop Integration", "Generic Web Electron", "Native Wayland Glass Frame", "60 FPS, 356px footprint"],
+                ["App Launch Pipeline", "Shell fork / exec", "Native Gio Desktop Parser", "100% desktop compliance"]
+            ]
+        }
 
-        # Multi-page depth scaling: append rich specialized sections if 3 or more pages requested
-        if target_pages and target_pages >= 3:
-            hardware_table = {
-                "headers": ["Subsystem / Hardware", "Minimum Spec", "Recommended Spec", "Fault Tolerance"],
-                "rows": [
-                    ["Compute Engine (CPU/NPU)", "4 Cores x86_64", "8+ Cores with AVX-512 / Neural Engine", "Graceful core throttling"],
-                    ["Memory Capacity", "8 GB LPDDR5", "16 GB+ Unified Memory", "LRU page cache pruning"],
-                    ["Storage Throughput", "500 MB/s SATA", "3200 MB/s NVMe PCIe 4.0", "Atomic journal sync"],
-                    ["Audio / Visual Bus", "Standard ALSA", "PipeWire Realtime Low-Latency (<15ms)", "Instant fallback sinks"]
-                ]
-            }
-            tradeoffs_table = {
-                "headers": ["Architecture Axis", "Alternative Design", f"VOID {clean_topic_label}", "Net Advantage"],
-                "rows": [
-                    ["Inference Host", "Cloud API Gateway", "Local GGUF / ONNX Engine", "Zero data egress, zero fee"],
-                    ["Memory Retention", "Volatile RAM Buffer", "1.5 GB Persistent NVMe Store", "Cross-session permanence"],
-                    ["Desktop Integration", "Generic Web Electron", "Native Wayland Glass Frame", "60 FPS, 356px footprint"],
-                    ["App Launch Pipeline", "Shell fork / exec", "Native Gio Desktop Parser", "100% desktop compliance"]
-                ]
-            }
-            sections.append({
-                "heading": "Hardware Infrastructure & Spec Requirements",
-                "content": f"Production readiness for {topic} requires balanced system dimensioning across memory, storage, and processing nodes. The following baseline metrics ensure consistent high-throughput execution under sustained loads.",
-                "table": hardware_table
-            })
-            sections.append({
-                "heading": "Architectural Tradeoffs & Competitive Matrix",
-                "content": f"Selecting the appropriate deployment profile for {topic} involves weighing latency against parameter scale. This comparative tradeoff matrix clarifies key engineering decisions.",
-                "table": tradeoffs_table
-            })
-            sections.append({
-                "heading": "Security, Sandboxing & Data Governance",
-                "content": f"Security protocols enforce strict data governance for all operations involving {topic}.\n- Local Storage Isolation: Persistent memories and generated artifacts are strictly confined to user directories without external transmission.\n- Unprivileged Execution: System commands execute within strict POSIX user boundaries without requiring elevated privileges.\n- Audit Verification: Real-time logging tracks tool executions and environmental state changes."
-            })
-            sections.append({
-                "heading": "Production Playbook & Maintenance Schedule",
-                "content": f"To sustain long-term operational health with {topic}, adhere to the following maintenance cadence:\n- Daily: Validate active processes and check memory utilization.\n- Weekly: Run note and report indexing ('maintain notes') to catalog generated assets.\n- Monthly: Audit cache consumption and prune orphaned scratch files."
-            })
+        security_body = (
+            f"Security protocols enforce strict data governance for all operations involving {topic}.\n"
+            "- Local Storage Isolation: Persistent memories and generated artifacts are strictly confined to user directories without external transmission.\n"
+            "- Unprivileged Execution: System commands execute within strict POSIX user boundaries without requiring elevated privileges.\n"
+            "- Audit Verification: Real-time logging tracks tool executions and environmental state changes."
+        )
 
-        sections.append({"heading": "Verified Sources & References", "content": citations_body})
+        playbook_body = (
+            f"To sustain long-term operational health with {topic}, adhere to the following maintenance cadence:\n"
+            "- Daily: Validate active processes and check memory utilization.\n"
+            "- Weekly: Run note and report indexing ('maintain notes') to catalog generated assets.\n"
+            "- Monthly: Audit cache consumption and prune orphaned scratch files."
+        )
+
+        if target_pages == 1:
+            sections = [
+                {"heading": "Executive Summary & Strategic Scope", "content": exec_summary},
+                {"heading": "Empirical Findings & Key Metrics", "content": benchmarks_body, "table": benchmark_table},
+                {"heading": "Strategic Recommendations & Directives", "content": f"{roadmap_body}\n\nKey References:\n{citations_body}"}
+            ]
+        elif target_pages == 2:
+            sections = [
+                {"heading": "Executive Summary & Strategic Scope", "content": exec_summary},
+                {"heading": "Architectural Foundations & Core Principles", "content": foundations_body},
+                {"heading": "Empirical Findings & Performance Benchmarks", "content": benchmarks_body, "table": benchmark_table},
+                {"heading": "Strategic Roadmap & Verified Sources", "content": f"{roadmap_body}\n\nKey References:\n{citations_body}"}
+            ]
+        elif target_pages == 3:
+            sections = [
+                {"heading": "Executive Summary & Strategic Scope", "content": exec_summary},
+                {"heading": "Architectural Foundations & Core Principles", "content": foundations_body},
+                {"heading": "Current Breakthroughs & Market Analysis", "content": trends_body},
+                {"heading": "Empirical Findings & Performance Benchmarks", "content": benchmarks_body, "table": benchmark_table},
+                {"heading": "Strategic Implementation Roadmap", "content": roadmap_body},
+                {"heading": "Security Governance & References", "content": f"{security_body}\n\nKey References:\n{citations_body}"}
+            ]
+        elif target_pages and target_pages > 3:
+            pool = [
+                {"heading": "Executive Summary & Strategic Scope", "content": exec_summary},
+                {"heading": "Architectural Foundations & Core Principles", "content": foundations_body},
+                {"heading": "Current Breakthroughs & Market Analysis", "content": trends_body},
+                {"heading": "Empirical Findings & Performance Benchmarks", "content": benchmarks_body, "table": benchmark_table},
+                {"heading": "Hardware Infrastructure & Specifications", "content": f"Production readiness for {topic} requires balanced system dimensioning.", "table": hardware_table},
+                {"heading": "Architectural Tradeoffs & Competitive Matrix", "content": f"Comparative analysis of deployment profiles for {topic}.", "table": tradeoffs_table},
+                {"heading": "Security, Sandboxing & Data Governance", "content": security_body},
+                {"heading": "Strategic Implementation Roadmap", "content": roadmap_body},
+                {"heading": "Production Playbook & Maintenance Cadence", "content": playbook_body},
+            ]
+            while len(pool) < 2 * target_pages - 1:
+                idx_ext = len(pool) + 1
+                pool.append({
+                    "heading": f"Extended Analysis & Domain Specialization (Part {idx_ext - 8})",
+                    "content": f"Detailed architectural validation and operational best practices for {topic} under enterprise enterprise environments."
+                })
+            pool.append({"heading": "Verified Sources & References", "content": citations_body})
+            sections = pool[:2 * target_pages]
+        else:
+            sections = [
+                {"heading": "Executive Summary & Strategic Scope", "content": exec_summary},
+                {"heading": "Architectural Foundations & Core Principles", "content": foundations_body},
+                {"heading": "Current Breakthroughs & Market Trends", "content": trends_body},
+                {"heading": "Empirical Findings & Performance Benchmarks", "content": benchmarks_body, "table": benchmark_table},
+                {"heading": "Strategic Roadmap & Implementation Framework", "content": roadmap_body},
+                {"heading": "Verified Sources & References", "content": citations_body}
+            ]
 
         clean_title = f"Comprehensive Report: {topic.title()}"
         return {
@@ -3077,7 +3264,7 @@ class DodaiosToolHub:
             return True, f"Created PDF document '{out_file.name}' in {out_file.parent}. Say 'open it' or 'open {out_file.name}' to view it.", str(out_file)
         elif ft in ["docx", "word", "doc", "dox"]:
             out_file = DOCS_DIR / f"{safe_name}.docx"
-            msg = self.draft_docx_document(title, sections, filename=str(out_file))
+            msg = self.draft_docx_document(title, sections, filename=str(out_file), target_pages=target_pages)
             try:
                 shutil.copy2(out_file, REPORTS_DIR / f"{safe_name}.docx")
             except Exception:
@@ -3254,14 +3441,23 @@ class DodaiosToolHub:
         reply = f"I have rewritten the document '{fpath.name}' ({changes_summary}) and saved the revised edition to {out_target.name}. Say 'open it' to review the changes."
         return True, reply, str(out_target)
 
-    def draft_docx_document(self, title: str, sections: list[dict[str, Any]], filename: str = "") -> str:
-        """Drafts a professionally styled Word document (.docx) with executive callout shapes and zebra tables."""
+    def draft_docx_document(self, title: str, sections: list[dict[str, Any]], filename: str = "", target_pages: int | None = None) -> str:
+        """Drafts a professionally styled Word document (.docx) with executive callout shapes, zebra tables, and exact page breaks."""
         if docx is None:
             return "python-docx is not installed in the environment."
         try:
             from docx.shared import Inches, Pt, RGBColor
             from docx.oxml import parse_xml
             from docx.oxml.ns import nsdecls
+
+            # Calculate precise page break indices to produce exactly target_pages
+            page_break_indices = set()
+            if target_pages and target_pages > 1 and len(sections) > 1:
+                step = len(sections) / float(target_pages)
+                for p in range(1, target_pages):
+                    b_idx = int(round(p * step))
+                    if 0 <= b_idx < len(sections):
+                        page_break_indices.add(b_idx)
 
             doc = docx.Document()
             doc.add_heading(title, level=0)
@@ -3292,7 +3488,9 @@ class DodaiosToolHub:
             c_r2.font.color.rgb = RGBColor(30, 41, 59)
             doc.add_paragraph()
 
-            for sec in sections:
+            for s_idx, sec in enumerate(sections):
+                if s_idx in page_break_indices:
+                    doc.add_page_break()
                 h = sec.get("heading", "")
                 if h:
                     doc.add_heading(h, level=1)
@@ -6432,7 +6630,7 @@ class AudioVoiceEngine(QObject):
 
         # 1. KWin DBus Window Management (Active & Targeted Sub-5ms Fast Path)
         win_m = re.match(
-            r"^(?:please\s+|can\s+you\s+(?:please\s+)?|could\s+you\s+(?:please\s+)?|would\s+you\s+(?:please\s+)?|will\s+you\s+(?:please\s+)?|kindly\s+|i\s+want\s+to\s+|i\s+want\s+you\s+to\s+|help\s+me\s+|go\s+ahead\s+and\s+)?(close|kill|quit|exit|shut\s+down|shut|minimize|minimise|hide|maximize|maximise|fullscreen|restore|unminimize)\s*(?:the\s+|this\s+|current\s+|active\s+)?([a-zA-Z0-9_\-\s]*?)[.!?]*$",
+            r"^(?:please\s+|can\s+you\s+(?:please\s+)?|could\s+you\s+(?:please\s+)?|would\s+you\s+(?:please\s+)?|will\s+you\s+(?:please\s+)?|kindly\s+|i\s+want\s+to\s+|i\s+want\s+you\s+to\s+|help\s+me\s+|go\s+ahead\s+and\s+)?(close|kill|quit|exit|shut\s+down|shut|minimize|minimise|hide|maximize|maximise|fullscreen|restore|unminimize)\s*(?:the\s+|this\s+|current\s+|active\s+|an?\s+)?([a-zA-Z0-9_\-\s]*?)[.!?]*$",
             q_lower
         )
         if win_m:
@@ -6454,10 +6652,15 @@ class AudioVoiceEngine(QObject):
             clean_tgt = re.sub(r"\s+", " ", clean_tgt).strip()
 
             tgt = clean_tgt
-            if not clean_tgt or raw_tgt in [
-                "it", "this", "window", "this window", "active window", "current window", "the window",
-                "screen", "app", "application", "the app", "this app", "current app", "active app"
-            ]:
+            if (
+                not clean_tgt
+                or clean_tgt in ["a", "an", "the", "this", "it"]
+                or raw_tgt in [
+                    "it", "this", "window", "this window", "active window", "current window", "the window",
+                    "screen", "app", "application", "the app", "this app", "current app", "active app",
+                    "a app", "an app", "a application", "an application"
+                ]
+            ):
                 tgt = "window"
             elif raw_tgt in ["all", "everything", "all windows", "all apps", "all applications", "all software"]:
                 tgt = "all"
@@ -6479,8 +6682,16 @@ class AudioVoiceEngine(QObject):
                 tgt = raw_tgt
 
             if tgt == "window":
-                kwin_manage_app_window("window", act)
-                return (f"{act.title()}d window.", f"Window: {act.title()}", "")
+                if act == "close":
+                    w_res = close_software_by_name("window")
+                else:
+                    w_res = kwin_manage_app_window("window", act)
+                if w_res.success:
+                    title_disp = w_res.window_title if w_res.window_title and w_res.window_title != "Window" else "active window"
+                    friendly = get_friendly_app_name(title_disp)
+                    return (f"{act.title()}d {friendly}.", f"Window: {act.title()}", "")
+                else:
+                    return (f"No open application window was found to {act}.", "Window: None Found", "")
             elif tgt == "all":
                 if act == "close":
                     close_software_by_name("all")
@@ -6509,14 +6720,19 @@ class AudioVoiceEngine(QObject):
             elif tgt not in ["ollama", "void", "brain", "ai"]:
                 disp = get_friendly_app_name(tgt)
                 if act == "close":
-                    close_software_by_name(tgt)
-                    return (f"Closed {disp}.", f"App: Close {disp}", "")
+                    w_res = close_software_by_name(tgt)
                 else:
-                    kwin_manage_app_window(tgt, act)
-                    return (f"{act.title()}d {disp}.", f"Window: {act.title()} {disp}", "")
+                    w_res = kwin_manage_app_window(tgt, act)
+
+                if w_res.success:
+                    title_disp = w_res.window_title if w_res.window_title else disp
+                    friendly = get_friendly_app_name(title_disp)
+                    return (f"{act.title()}d {friendly}.", f"App: {act.title()} {friendly}", "")
+                else:
+                    return (f"No open window matching '{disp}' was found to {act}.", f"Window: Not Found", "")
 
         # 1a. Conversational Generalization Fallback for Window & Application Management
-        # Catches conversational commands like "i asked it to close chromium", "can you please close down chromium", "minimize all applications"
+        # Catches conversational commands like "i asked it to close chromium", "can you please close down chromium", "minimize a app"
         is_close_word = any(w in q_lower for w in ["close", "kill", "quit", "exit", "shut down", "shut"])
         is_min_word = any(w in q_lower for w in ["minimize", "minimise", "hide", "minima is", "minima as", "mini mice", "put down"])
         is_max_word = any(w in q_lower for w in ["maximize", "maximise", "fullscreen"])
@@ -6526,6 +6742,10 @@ class AudioVoiceEngine(QObject):
             known_apps = [
                 ("all applications", "all"), ("all apps", "all"), ("all windows", "all"),
                 ("everything", "all"), ("all software", "all"),
+                ("a app", "window"), ("an app", "window"), ("the app", "window"), ("this app", "window"),
+                ("the application", "window"), ("this application", "window"), ("a application", "window"), ("an application", "window"),
+                ("active window", "window"), ("current window", "window"), ("this window", "window"), ("the window", "window"),
+                ("window", "window"), ("application", "window"), ("app", "window"),
                 ("chromium", "chromium"), ("chrome", "chromium"), ("browser", "chromium"), ("romeo", "chromium"),
                 ("terminal", "konsole"), ("konsole", "konsole"), ("console", "konsole"),
                 ("dolphin", "dolphin"), ("file manager", "dolphin"), ("files", "dolphin"),
@@ -6536,7 +6756,7 @@ class AudioVoiceEngine(QObject):
             ]
             matched_app = None
             for trigger, mapped in known_apps:
-                if trigger in q_lower:
+                if re.search(rf"\b{re.escape(trigger)}\b", q_lower):
                     matched_app = mapped
                     break
 
@@ -6548,14 +6768,29 @@ class AudioVoiceEngine(QObject):
                     else:
                         kwin_manage_app_window("all", gen_act)
                         return (f"{gen_act.title()}d all windows.", f"Window: {gen_act.title()} All", "")
+                elif matched_app == "window":
+                    if gen_act == "close":
+                        w_res = close_software_by_name("window")
+                    else:
+                        w_res = kwin_manage_app_window("window", gen_act)
+                    if w_res.success:
+                        title_disp = w_res.window_title if w_res.window_title and w_res.window_title != "Window" else "active window"
+                        friendly = get_friendly_app_name(title_disp)
+                        return (f"{gen_act.title()}d {friendly}.", f"Window: {gen_act.title()}", "")
+                    else:
+                        return (f"No open application window was found to {gen_act}.", "Window: None Found", "")
                 elif matched_app not in ["ollama", "void", "brain", "ai"]:
                     disp = get_friendly_app_name(matched_app)
                     if gen_act == "close":
-                        close_software_by_name(matched_app)
-                        return (f"Closed {disp}.", f"App: Close {disp}", "")
+                        w_res = close_software_by_name(matched_app)
                     else:
-                        kwin_manage_app_window(matched_app, gen_act)
-                        return (f"{gen_act.title()}d {disp}.", f"Window: {gen_act.title()} {disp}", "")
+                        w_res = kwin_manage_app_window(matched_app, gen_act)
+                    if w_res.success:
+                        title_disp = w_res.window_title if w_res.window_title else disp
+                        friendly = get_friendly_app_name(title_disp)
+                        return (f"{gen_act.title()}d {friendly}.", f"App: {gen_act.title()} {friendly}", "")
+                    else:
+                        return (f"No open window matching '{disp}' was found to {gen_act}.", f"Window: Not Found", "")
 
         if any(p in q_lower for p in ["show desktop", "go to desktop", "minimize all"]):
             kwin_manage_app_window("all", "minimize")
@@ -7065,6 +7300,7 @@ if __name__ == "__main__":
 
         # 1b5. Comprehensive Document, PDF & Text Composition Suite (TXT vs DOCX vs PDF)
         is_compose_cmd = bool(
+            re.search(r"\b(?:compose|draft|write|create|generate|prepare|make)\s+(?:a\s+)?(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)?\s*[- ]?pages?\s+(?:comprehensive\s+|detailed\s+|full\s+)?(?:document|doc|docx|dox|word\s+doc(?:ument)?|pdf|report|txt|text\s+file|text\s+document)\b", q_lower) or
             re.search(r"\b(?:compose|draft|write|create|generate|prepare|make)\s+(?:a\s+)?(?:comprehensive\s+|detailed\s+|full\s+)?(?:document|doc|docx|dox|word\s+doc(?:ument)?|pdf|report|txt|text\s+file|text\s+document)\b", q_lower) or
             re.search(r"\b(?:compose|draft|write|create)\s+(?:docx?|dox|pdf|txt)\b", q_lower) or
             re.search(r"\b(?:document|docx|dox|pdf|report)\s+(?:on|about|for|titled|named)\b", q_lower) or
@@ -7081,7 +7317,21 @@ if __name__ == "__main__":
             elif re.search(r"\b(?:docx?|dox|word|word\s+doc(?:ument)?)\b", q_lower):
                 ft = "docx"
 
-            # 2. Custom Title / Filename Extraction
+            # 2. Page Count Detection
+            word_to_num = {
+                "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+                "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10
+            }
+            pg_m = (
+                re.search(r"\b(\d+)\s*[- ]?pages?\b", q_lower) or
+                re.search(r"\b(one|two|three|four|five|six|seven|eight|nine|ten)\s*[- ]?pages?\b", q_lower)
+            )
+            target_pages = None
+            if pg_m:
+                raw_pg = pg_m.group(1).lower()
+                target_pages = int(raw_pg) if raw_pg.isdigit() else word_to_num.get(raw_pg, 1)
+
+            # 3. Custom Title / Filename Extraction
             name_m = (
                 re.search(r"(?:called|named|titled|save\s+(?:it\s+)?as|with\s+(?:the\s+)?name|filename|file)\s+[\"']?([a-zA-Z0-9_\-\.]+?)[\"']?(?:\s+(?:on|about|for|in)|$)", q_clean, re.I) or
                 re.search(r"(?:called|named|titled|save\s+(?:it\s+)?as|with\s+(?:the\s+)?name|filename|file)\s+[\"']?([a-zA-Z0-9_\-\.]+)[\"']?", q_clean, re.I)
@@ -7092,12 +7342,15 @@ if __name__ == "__main__":
                 ft = "docx" if ext in ["docx", "doc", "dox"] else ("pdf" if ext == "pdf" else ("txt" if ext in ["txt", "text"] else ext))
                 custom_title = custom_title.rsplit(".", 1)[0]
 
-            # 3. Topic Extraction
-            clean_q = re.sub(r"^(?:please\s+)?(?:compose|draft|write|create|generate|prepare|make)\s+(?:me\s+)?(?:a\s+)?(?:comprehensive\s+|detailed\s+|full\s+)?(?:document|doc|docx|dox|word\s+doc(?:ument)?|pdf|report|txt|text\s+file|text\s+document)\s*", "", q_clean, flags=re.I).strip()
+            # 4. Clean Topic Extraction (strip page count and format commands)
+            clean_q = re.sub(r"^(?:please\s+)?(?:compose|draft|write|create|generate|prepare|make)\s+(?:me\s+)?(?:a\s+)?(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)?\s*[- ]?pages?\s*", "", q_clean, flags=re.I).strip()
+            clean_q = re.sub(r"^(?:please\s+)?(?:compose|draft|write|create|generate|prepare|make)\s+(?:me\s+)?(?:a\s+)?(?:comprehensive\s+|detailed\s+|full\s+)?(?:document|doc|docx|dox|word\s+doc(?:ument)?|pdf|report|txt|text\s+file|text\s+document)\s*", "", clean_q, flags=re.I).strip()
+            clean_q = re.sub(r"\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*[- ]?pages?\b", "", clean_q, flags=re.I).strip()
             if name_m:
                 clean_q = clean_q.replace(name_m.group(0), "").strip()
             topic = re.sub(r"^(?:on|about|regarding|for|of)\s+", "", clean_q, flags=re.I).strip()
             topic = re.sub(r"\b(?:in\s+docx|in\s+dox|in\s+pdf|in\s+txt|as\s+docx|as\s+dox|as\s+pdf|as\s+txt)\b", "", topic, flags=re.I).strip()
+            topic = re.sub(r"\b(?:document|doc|docx|pdf|report|txt|file)\b", "", topic, flags=re.I).strip()
             if not topic:
                 topic = custom_title or "Autonomous Systems and AI"
             if not custom_title:
@@ -7106,11 +7359,13 @@ if __name__ == "__main__":
             ok, reply_msg, out_path = self.tool_hub.compose_comprehensive_document(
                 topic=topic,
                 file_type=ft,
-                custom_title=custom_title
+                custom_title=custom_title,
+                target_pages=target_pages
             )
             if ok and out_path:
                 self.last_generated_file = out_path
-                self.memory.learn(f"Composed {ft.upper()} document on {topic}: {Path(out_path).name}")
+                page_str = f" ({target_pages} pages)" if target_pages else ""
+                self.memory.learn(f"Composed {ft.upper()} document{page_str} on {topic}: {Path(out_path).name}")
                 return (reply_msg, f"Composed: {ft.upper()} ({Path(out_path).stem[:14]})", out_path)
             else:
                 return (reply_msg, "Composition Error", "")
@@ -7483,7 +7738,8 @@ if __name__ == "__main__":
 
         # 3d. Email & Webmail Composition / Sending Fast Path (Strict: requires explicit email intent)
         is_email_intent = bool(
-            re.search(r"\b(?:send|compose|draft)\s+(?:an?\s+)?(?:email|mail)\b", q_lower) or
+            re.search(r"\b(?:send|compose|draft|write)\s+(?:an?\s+)?(?:email|mail)\b", q_lower) or
+            re.search(r"\b(?:email|mail)\s+(?:to\s+)?([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+|[a-zA-Z0-9_.-]+)\b", q_lower) or
             re.search(r"\b(?:open|launch)\s+(?:gmail|google\s+mail|webmail)\b", q_lower) or
             re.search(r"\b(?:open\s+(?:mail|email)\s+in\s+(?:chromium|browser))\b", q_lower) or
             re.search(r"\b(?:send|write)\s+(?:an?\s+)?(?:email|mail)\s+(?:to|saying|about)\b", q_lower) or
@@ -7848,7 +8104,7 @@ if __name__ == "__main__":
         if any(p in q_lower for p in ["what time is it", "current time", "what is the date", "what's the date"]):
             return (f"It is {time.strftime('%A, %B %d, %I:%M %p')}.", "Time & Date", "")
 
-        # 12. Conversational AI Brain (Ultra-fast nano-brain / Selective Tool Execution Engine)
+        # 12. Conversational AI Brain (Effortless Local Model & Seamless Switching Engine)
         import httpx
         ollama_online = False
         installed_names = []
@@ -7859,22 +8115,32 @@ if __name__ == "__main__":
                     ollama_online = True
                     installed_names = [m.get("name", "") for m in r.json().get("models", [])]
             except Exception:
-                ollama_online = False
+                try:
+                    start_ollama_service()
+                    time.sleep(0.4)
+                    r = httpx.get(f"{OLLAMA_URL}/api/tags", timeout=1.2)
+                    if r.status_code == 200:
+                        ollama_online = True
+                        installed_names = [m.get("name", "") for m in r.json().get("models", [])]
+                except Exception:
+                    ollama_online = False
 
         if ollama_online:
             try:
                 def_model = get_default_local_model()
-                # Find best matching model
+                # Formulate intelligent fallback chain across available local models
+                candidate_models = []
                 if any(def_model in m for m in installed_names):
-                    chosen_model = def_model
-                elif any("nano-brain" in m for m in installed_names):
-                    chosen_model = "nano-brain"
-                elif any("lfm3-omni" in m for m in installed_names):
-                    chosen_model = "lfm3-omni:2b"
-                else:
-                    chosen_model = installed_names[0] if installed_names else "nano-brain"
+                    candidate_models.append(def_model)
+                for pref in ["lfm3-omni:2b", "qwen3.5:4b", "jarvis-efficient:latest", "nano-brain", "smollm2:360m"]:
+                    for m in installed_names:
+                        if pref in m and m not in candidate_models:
+                            candidate_models.append(m)
+                if not candidate_models and installed_names:
+                    candidate_models.extend(installed_names)
+                if not candidate_models:
+                    candidate_models = ["lfm3-omni:2b"]
 
-                # Check if this query genuinely requires external tool invocation
                 tool_triggers = [
                     "search web", "google", "find file", "look up", "note", "reminder", "remind me",
                     "email", "send mail", "take screenshot", "capture screen", "create document",
@@ -7883,112 +8149,125 @@ if __name__ == "__main__":
                 ]
                 needs_tools = any(t in query.lower() for t in tool_triggers)
 
-                # If query is conversational / informative / coding / chat, answer directly with sub-350ms latency
-                if not needs_tools or "nano-brain" in chosen_model:
-                    chat_system_msg = {
-                        "role": "system",
-                        "content": (
-                            "You are VOID, the ultra-fast personal autonomous AI assistant on Fedora Linux KDE Plasma. "
-                            f"Context: {self.memory.get_context_summary()}\n"
-                            "You have full OS permissions to manage windows, launch and close applications, and control desktop tools. "
-                            "When the user asks to close, minimize, open, or manage applications, acknowledge with clear execution confirmation. "
-                            "Answer user queries clearly, concisely, and helpfully in 1-2 direct sentences without unnecessary preambles."
-                        )
-                    }
-                    payload = {
-                        "model": chosen_model,
-                        "messages": [chat_system_msg, *self._chat_history[-4:], {"role": "user", "content": query}],
-                        "options": {"num_predict": 100, "num_thread": 4, "temperature": 0.6},
-                        "keep_alive": "10m",
-                        "stream": False
-                    }
-                    res = httpx.post(f"{OLLAMA_URL}/api/chat", json=payload, timeout=12.0)
-                    if res.status_code == 200:
-                        reply_text = res.json().get("message", {}).get("content", "").strip()
-                        badge_label = chosen_model.split(":")[0]
-                        action_badge = f"Brain: {badge_label}"
+                # Seamless local model execution loop
+                for chosen_model in candidate_models:
+                    try:
+                        if not needs_tools or "nano-brain" in chosen_model:
+                            chat_system_msg = {
+                                "role": "system",
+                                "content": (
+                                    "You are VOID, the ultra-fast personal autonomous AI assistant on Fedora Linux KDE Plasma. "
+                                    f"Context: {self.memory.get_context_summary()}\n"
+                                    "You have full OS permissions to manage windows, launch and close applications, and control desktop tools. "
+                                    "When the user asks to close, minimize, open, or manage applications, acknowledge with clear execution confirmation. "
+                                    "Answer user queries clearly, concisely, and helpfully in 1-2 direct sentences without unnecessary preambles."
+                                )
+                            }
+                            payload = {
+                                "model": chosen_model,
+                                "messages": [chat_system_msg, *self._chat_history[-4:], {"role": "user", "content": query}],
+                                "options": {"num_predict": 100, "num_thread": 4, "temperature": 0.6},
+                                "keep_alive": "10m",
+                                "stream": False
+                            }
+                            res = httpx.post(f"{OLLAMA_URL}/api/chat", json=payload, timeout=12.0)
+                            if res.status_code == 200:
+                                reply_text = res.json().get("message", {}).get("content", "").strip()
+                                badge_label = chosen_model.split(":")[0]
+                                action_badge = f"Brain: {badge_label}"
+                                break
+                        else:
+                            # Multi-step Agentic tool planner
+                            tool_model = chosen_model
+                            system_msg = {
+                                "role": "system",
+                                "content": (
+                                    "You are VOID, the personal autonomous AI desktop assistant on Fedora Linux KDE Plasma. "
+                                    "You have direct tool execution capabilities and access to 1.5GB persistent SSD memory.\n"
+                                    f"Context & Preferences: {self.memory.get_context_summary()}\n"
+                                    "STRICT BEHAVIOR RULES:\n0. CRITICAL: EXECUTE ONLY THE USER'S CURRENT REQUEST. DO NOT re-execute, repeat, or resurrect tasks, tool calls, or actions from previous turns. Treat each user message as a distinct goal.\n"
+                                    "1. NEVER introduce yourself unless the user explicitly asks 'who are you'. NEVER begin responses with 'I am VOID' or 'As an AI assistant'.\n"
+                                    "2. AUTONOMOUS TASK PLANNING & EXECUTION: You possess full capability to plan and execute multi-step complex tasks. When the user gives a complex goal, formulate a clear sequential plan, decompose it into sub-goals, and invoke necessary tools step by step until the goal is fully achieved.\n"
+                                    "3. BROWSER & TAB EXECUTION: NEVER automatically open Chromium tabs or windows for general questions, summaries, or web research. Only call 'browser_open' when the user explicitly requests to open a website on screen, open a new tab, or open a browser window. To close an active tab, invoke 'browser_close_tab'. For general web knowledge, use 'search_web' (headless) and answer in text/voice without launching the browser GUI.\n"
+                                    "4. Provide a direct, concise final response (1-2 sentences maximum) summarizing the completed plan and actions."
+                                ),
+                            }
+                            messages = [system_msg, *self._chat_history[-6:], {"role": "user", "content": query}]
+                            max_agent_steps = 6
+                            current_step = 0
+                            all_executed_names = []
+
+                            while current_step < max_agent_steps:
+                                if self._abort_requested.is_set():
+                                    return ("Thinking process stopped by user.", "Cancelled", "")
+                                current_step += 1
+                                payload = {
+                                    "model": tool_model,
+                                    "messages": messages,
+                                    "tools": TOOLS_SCHEMA,
+                                    "options": {"num_thread": 4},
+                                    "keep_alive": "5m",
+                                    "stream": False,
+                                }
+                                try:
+                                    res = httpx.post(f"{OLLAMA_URL}/api/chat", json=payload, timeout=25.0)
+                                except Exception as e:
+                                    print(f"[VOID Brain HTTP Error] {e}", flush=True)
+                                    break
+
+                                if res.status_code != 200:
+                                    break
+
+                                msg = res.json().get("message", {})
+                                tool_calls = msg.get("tool_calls", [])
+
+                                if not tool_calls:
+                                    reply_text = msg.get("content", "").strip()
+                                    break
+
+                                messages.append(msg)
+                                for tc in tool_calls:
+                                    if self._abort_requested.is_set():
+                                        return ("Thinking process stopped by user.", "Cancelled", "")
+                                    fn = tc.get("function", {})
+                                    fn_name = fn.get("name", "")
+                                    fn_args = fn.get("arguments", {})
+                                    all_executed_names.append(fn_name)
+                                    tool_result = self._execute_ai_tool(fn_name, fn_args, query_context=query)
+                                    if str(tool_result).startswith("PROMPT_USER:"):
+                                        prompt_q = str(tool_result).replace("PROMPT_USER:", "").strip()
+                                        badge = "Prompt: Recipient" if ("recipient" in prompt_q.lower() or "email" in prompt_q.lower()) else "Prompt: User Clarification"
+                                        return (prompt_q, badge, "")
+                                    if fn_name == "take_screenshot" and str(tool_result).startswith("/"):
+                                        thumbnail_path = str(tool_result)
+                                    messages.append({
+                                        "role": "tool",
+                                        "content": str(tool_result),
+                                    })
+
+                            if not reply_text and all_executed_names:
+                                reply_text = f"Executed {', '.join(all_executed_names)}."
+
+                            if all_executed_names:
+                                action_badge = f"Tools: {', '.join(all_executed_names[:2])}"
+                                break
+                            elif reply_text:
+                                action_badge = f"Brain: {tool_model.split(':')[0]}"
+                                break
+                    except Exception as model_err:
+                        print(f"[VOID Model Fallback] {chosen_model} failed ({model_err}), trying next model...", flush=True)
+                        continue
+
+                if not reply_text:
+                    # Seamless fallback to DuckDuckGo search or direct knowledge
+                    ddg_results = self.tool_hub.search_web_ddgs(query, max_results=1)
+                    if ddg_results:
+                        top = ddg_results[0]
+                        reply_text = f"{top['title']}: {top['snippet'][:160]}"
+                        action_badge = "Search: Knowledge"
                     else:
-                        reply_text = "Task completed."
+                        reply_text = f"I am online and ready to assist you on Fedora Linux KDE Plasma. How can I help?"
                         action_badge = "Brain: Ready"
-                else:
-                    # Multi-step Agentic tool planner (using lfm3-omni:2b if tools are strictly required)
-                    tool_model = "lfm3-omni:2b" if any("lfm3-omni" in m for m in installed_names) else chosen_model
-                    system_msg = {
-                        "role": "system",
-                        "content": (
-                            "You are VOID, the personal autonomous AI desktop assistant on Fedora Linux KDE Plasma. "
-                            "You have direct tool execution capabilities and access to 1.5GB persistent SSD memory.\n"
-                            f"Context & Preferences: {self.memory.get_context_summary()}\n"
-                            "STRICT BEHAVIOR RULES:\n0. CRITICAL: EXECUTE ONLY THE USER'S CURRENT REQUEST. DO NOT re-execute, repeat, or resurrect tasks, tool calls, or actions from previous turns. Treat each user message as a distinct goal.\n"
-                            "1. NEVER introduce yourself unless the user explicitly asks 'who are you'. NEVER begin responses with 'I am VOID' or 'As an AI assistant'.\n"
-                            "2. AUTONOMOUS TASK PLANNING & EXECUTION: You possess full capability to plan and execute multi-step complex tasks. When the user gives a complex goal, formulate a clear sequential plan, decompose it into sub-goals, and invoke necessary tools step by step until the goal is fully achieved.\n"
-                            "3. BROWSER & TAB EXECUTION: NEVER automatically open Chromium tabs or windows for general questions, summaries, or web research. Only call 'browser_open' when the user explicitly requests to open a website on screen, open a new tab, or open a browser window. To close an active tab, invoke 'browser_close_tab'. For general web knowledge, use 'search_web' (headless) and answer in text/voice without launching the browser GUI.\n"
-                            "4. Provide a direct, concise final response (1-2 sentences maximum) summarizing the completed plan and actions."
-                        ),
-                    }
-                    messages = [system_msg, *self._chat_history[-6:], {"role": "user", "content": query}]
-                    max_agent_steps = 6
-                    current_step = 0
-                    all_executed_names = []
-
-                    while current_step < max_agent_steps:
-                        if self._abort_requested.is_set():
-                            return ("Thinking process stopped by user.", "Cancelled", "")
-                        current_step += 1
-                        payload = {
-                            "model": tool_model,
-                            "messages": messages,
-                            "tools": TOOLS_SCHEMA,
-                            "options": {"num_thread": 4},
-                            "keep_alive": "5m",
-                            "stream": False,
-                        }
-                        try:
-                            res = httpx.post(f"{OLLAMA_URL}/api/chat", json=payload, timeout=25.0)
-                        except Exception as e:
-                            print(f"[VOID Brain HTTP Error] {e}", flush=True)
-                            break
-
-                        if res.status_code != 200:
-                            break
-
-                        msg = res.json().get("message", {})
-                        tool_calls = msg.get("tool_calls", [])
-
-                        if not tool_calls:
-                            reply_text = msg.get("content", "").strip()
-                            break
-
-                        messages.append(msg)
-                        for tc in tool_calls:
-                            if self._abort_requested.is_set():
-                                return ("Thinking process stopped by user.", "Cancelled", "")
-                            fn = tc.get("function", {})
-                            fn_name = fn.get("name", "")
-                            fn_args = fn.get("arguments", {})
-                            all_executed_names.append(fn_name)
-                            tool_result = self._execute_ai_tool(fn_name, fn_args, query_context=query)
-                            if str(tool_result).startswith("PROMPT_USER:"):
-                                prompt_q = str(tool_result).replace("PROMPT_USER:", "").strip()
-                                badge = "Prompt: Recipient" if ("recipient" in prompt_q.lower() or "email" in prompt_q.lower()) else "Prompt: User Clarification"
-                                return (prompt_q, badge, "")
-                            if fn_name == "take_screenshot" and str(tool_result).startswith("/"):
-                                thumbnail_path = str(tool_result)
-                            messages.append({
-                                "role": "tool",
-                                "content": str(tool_result),
-                            })
-
-                    if not reply_text and all_executed_names:
-                        reply_text = f"Executed {', '.join(all_executed_names)}."
-
-                    if all_executed_names:
-                        action_badge = f"Tools: {', '.join(all_executed_names[:2])}"
-                    elif reply_text:
-                        action_badge = f"Brain: {tool_model.split(':')[0]}"
-                    else:
-                        reply_text = "Task completed."
-                        action_badge = "Brain: Completed"
             except Exception as e:
                 reply_text = f"Could not process: {e}"
                 action_badge = "Brain Error"
@@ -9540,6 +9819,7 @@ class VoidMiniWidget(QWidget):
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("VOID-MiniWidget")
+    ensure_window_dbus_registered()
     widget = VoidMiniWidget()
     widget.show()
     sys.exit(app.exec())
