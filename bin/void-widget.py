@@ -973,23 +973,43 @@ def kwin_shortcut(shortcut_name: str) -> bool:
 
 def close_software_by_name(name: str) -> bool:
     clean = name.strip().lower()
+    
+    # 1. Close everything / all applications
+    if clean in ["all", "everything", "all windows", "all apps", "all applications", "all software"]:
+        kwin_manage_app_window("all", "close")
+        time.sleep(0.15)
+        for app in ["chromium", "firefox", "konsole", "dolphin", "kate", "kwrite", "kcalc", "vlc", "systemsettings"]:
+            try:
+                subprocess.run(["pkill", "-f", app], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
+        return True
+
+    # 2. Try closing window gracefully via KWin
+    kwin_res = kwin_manage_app_window(clean, "close")
+    time.sleep(0.1)
+
+    # 3. Check App Registry
     if SYSTEM_APP_REGISTRY.close(clean):
         return True
 
+    # 4. Target mapping fallback
     app_map = {
         "antigravity": "antigravity-ide",
         "chromium": "chromium", "firefox": "firefox", "browser": "chromium",
         "dolphin": "dolphin", "files": "dolphin", "file manager": "dolphin",
-        "terminal": "konsole", "konsole": "konsole", "kate": "kwrite",
+        "terminal": "konsole", "konsole": "konsole", "kate": "kate",
         "kwrite": "kwrite", "kcalc": "kcalc", "calculator": "kcalc",
-        "vlc": "vlc", "settings": "systemsettings"
+        "vlc": "vlc", "settings": "systemsettings", "system settings": "systemsettings"
     }
     target = app_map.get(clean, clean)
     try:
-        subprocess.run(["pkill", "-f", target], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return True
+        res = subprocess.run(["pkill", "-f", target], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if res.returncode == 0 or kwin_res:
+            return True
     except Exception:
-        return False
+        pass
+    return kwin_res
 def spawn_software(binary: str) -> bool:
     try:
         parts = binary.split()
@@ -1045,29 +1065,75 @@ def kwin_manage_app_window(app_name: str, action: str) -> bool:
     app_map = {
         "chromium": "chromium", "browser": "chromium", "firefox": "firefox",
         "terminal": "konsole", "konsole": "konsole", "dolphin": "dolphin",
-        "files": "dolphin", "calculator": "kcalc", "kcalc": "kcalc",
-        "text editor": "kwrite", "kwrite": "kwrite", "kate": "kate"
+        "files": "dolphin", "file manager": "dolphin", "calculator": "kcalc", "kcalc": "kcalc",
+        "text editor": "kwrite", "kwrite": "kwrite", "kate": "kate",
+        "settings": "systemsettings", "system settings": "systemsettings",
+        "antigravity": "antigravity", "ide": "antigravity"
     }
     target = app_map.get(clean_app, clean_app)
+    act = action.strip().lower()
+
     script = f"""
-    var windows = workspace.windowList();
-    for (var i = 0; i < windows.length; i++) {{
-        var w = windows[i];
-        var res = (w.resourceClass || '').toLowerCase();
-        var cap = (w.caption || '').toLowerCase();
-        if (res.indexOf('{target}') !== -1 || cap.indexOf('{target}') !== -1) {{
-            if ('{action}' === 'minimize') {{
-                w.minimized = true;
-            }} else if ('{action}' === 'maximize') {{
-                w.maximized = 3;
-            }} else if ('{action}' === 'fullscreen') {{
-                w.fullScreen = !w.fullScreen;
-            }} else if ('{action}' === 'close') {{
-                w.closeWindow();
-            }} else if ('{action}' === 'activate') {{
-                workspace.activeWindow = w;
+    var isAll = ("{target}" === "all" || "{target}" === "everything" || "{target}" === "all windows" || "{target}" === "all apps" || "{target}" === "all applications" || "{target}" === "all software");
+    var isGeneric = ("{target}" === "window" || "{target}" === "active window" || "{target}" === "current window" || "{target}" === "this" || "{target}" === "this window" || "{target}" === "the window" || "{target}" === "screen" || "{target}" === "app" || "{target}" === "application" || "{target}" === "the app" || "{target}" === "this app" || "{target}" === "current app" || "{target}" === "active app");
+    var wins = workspace.windowList();
+
+    function isAppWindow(w) {{
+        if (!w || !w.normalWindow) return false;
+        var res = (w.resourceClass || "").toLowerCase();
+        var cap = (w.caption || "").toLowerCase();
+        if (res.indexOf("quickshell") !== -1 || res.indexOf("plasmashell") !== -1 || res.indexOf("xwaylandvideobridge") !== -1) return false;
+        if (res.indexOf("python") !== -1 && cap.indexOf("void") !== -1) return false;
+        return true;
+    }}
+    
+    function applyAction(w, a) {{
+        if (a === "minimize") {{
+            w.minimized = true;
+        }} else if (a === "restore" || a === "unminimize") {{
+            w.minimized = false;
+            workspace.activeWindow = w;
+        }} else if (a === "maximize") {{
+            try {{ w.setMaximize(true, true); }} catch(e) {{ w.maximized = 3; }}
+        }} else if (a === "fullscreen") {{
+            w.fullScreen = !w.fullScreen;
+        }} else if (a === "close") {{
+            w.closeWindow();
+        }} else if (a === "activate") {{
+            workspace.activeWindow = w;
+        }}
+    }}
+
+    if (isGeneric) {{
+        var actWin = workspace.activeWindow;
+        if (isAppWindow(actWin)) {{
+            applyAction(actWin, "{act}");
+        }} else {{
+            for (var i = wins.length - 1; i >= 0; i--) {{
+                var w = wins[i];
+                if (isAppWindow(w) && !w.minimized) {{
+                    applyAction(w, "{act}");
+                    break;
+                }}
             }}
-            break;
+        }}
+    }} else if (isAll) {{
+        for (var i = 0; i < wins.length; i++) {{
+            var w = wins[i];
+            if (isAppWindow(w)) {{
+                applyAction(w, "{act}");
+            }}
+        }}
+    }} else {{
+        for (var i = 0; i < wins.length; i++) {{
+            var w = wins[i];
+            if (!w.normalWindow) continue;
+            var res = (w.resourceClass || "").toLowerCase();
+            var cap = (w.caption || "").toLowerCase();
+            if (res.indexOf("{target}") !== -1 || cap.indexOf("{target}") !== -1) {{
+                applyAction(w, "{act}");
+                break;
+            }}
         }}
     }}
     """
@@ -1082,7 +1148,9 @@ def kwin_manage_app_window(app_name: str, action: str) -> bool:
         num = load_res.stdout.strip()
         if num:
             subprocess.run(["qdbus-qt6", "org.kde.KWin", f"/Scripting/Script{num}", "org.kde.kwin.Script.run"], timeout=1.0)
+            time.sleep(0.22)
             subprocess.run(["qdbus-qt6", "org.kde.KWin", f"/Scripting/Script{num}", "org.kde.kwin.Script.stop"], timeout=1.0)
+            subprocess.run(["qdbus-qt6", "org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting.unloadScript", fpath], timeout=1.0)
             try:
                 os.remove(fpath)
             except Exception:
@@ -1965,18 +2033,18 @@ def extract_media_song_query(text: str) -> str:
     s = text.strip()
     s = re.sub(r"^(?:hey|hi|hello|ok|okay)?\s*(?:void|computer)?\s*[,:]?\s*", "", s, flags=re.I)
     s = re.sub(r"^(?:please|can you|could you|i want to|kindly)\s+", "", s, flags=re.I)
+    s = re.sub(r"^(?:play\s+a\s+wide|play\s+wide|hair\s*wide|k[- ]?wide|a\s+wide)\s*[,:]?\s*", "", s, flags=re.I)
 
-    # Complex multi-step instructions e.g. "search for X, open the correct result, play the song..."
-    m_complex = re.search(r"search\s+(?:for\s+)?(.+?)(?:,\s*open|\s+and\s+open|\s+and\s+play|\s+open\s+the|$)", s, re.I)
-    if m_complex:
-        candidate = m_complex.group(1).strip()
-        candidate = re.sub(r"\b(?:song|video|track|music|in\s+youtube|on\s+youtube)\b", "", candidate, flags=re.I).strip()
-        if candidate and len(candidate.split()) <= 8:
-            return candidate
+    s_low = s.lower().strip()
+    if s_low in ["play wide", "play a wide", "wide", "a wide", "k wide", "k-wide", "hair wide", "hey wide", "hey void", "void", "computer", "top music hits"]:
+        return ""
 
     patterns = [
         r"(?:open\s+)?youtube(?:\s+in\s+chromium)?\s+(?:and\s+)?(?:play|search(?:\s+for)?)\s+(.+)",
         r"(?:open\s+chromium\s+(?:and\s+)?(?:go\s+to\s+)?youtube\s+(?:and\s+)?(?:play|search(?:\s+for)?)\s+)(.+)",
+        r"(?:open\s+chromium\s+and\s+play\s+)(.+)",
+        r"search\s+(?:for\s+)?(?:the\s+)?song\s+(.+)",
+        r"search\s+(?:for\s+)?(.+?)\s+song",
         r"play\s+(?:the\s+)?(?:song|track)\s+(.+)",
         r"play\s+(.+?)\s+(?:on|in)\s+youtube",
         r"play\s+(.+?)\s+song(?:\s+(?:on|in)\s+youtube)?",
@@ -1992,14 +2060,29 @@ def extract_media_song_query(text: str) -> str:
             clean = re.sub(r"\b(?:in\s+chromium|on\s+youtube|in\s+youtube|and\s+play(?:\s+it)?|play\s+it|and\s+confirm.*|the\s+song|song|video|track|music)\b", "", raw, flags=re.I).strip()
             clean = re.sub(r"^(?:for|a|the|to|and)\s+", "", clean, flags=re.I).strip()
             clean = re.sub(r"\s+", " ", clean).strip()
-            if clean:
+            if clean and clean.lower() not in ["it", "something", "a", "the", "me", "wide", "a wide", "k wide", "hair wide"]:
                 return clean
 
     clean = re.sub(r"\b(?:open|new|tab|in|chromium|youtube|play|song|video|track|please|can|you|and|for|a|the|to|me)\b", "", s, flags=re.I).strip()
-    return clean or "Top Music Hits"
+    if clean.lower() in ["wide", "a wide", "k wide", "hair wide"]:
+        return ""
+    return clean
 
 def split_compound_commands(query: str) -> list[str]:
     q = query.strip()
+    
+    # Clean Whisper misheard wake artifacts (e.g. "play wide, open chromium and play believer")
+    q_norm = re.sub(r"^(?:play\s+a\s+wide|play\s+wide|hair\s*wide|k[- ]?wide|a\s+wide)\s*[,:]?\s*", "", q, flags=re.I).strip()
+    if q_norm and len(q_norm) > 4:
+        q = q_norm
+
+    # Unified intent guard: DO NOT split single-intent media, search, and browser playback workflows!
+    if re.search(r"\b(?:open\s+)?(?:youtube|chromium|browser|google)\s+(?:in\s+chromium\s+)?(?:and\s+)?(?:search(?:\s+for)?|play)\b", q, re.I) or \
+       re.search(r"\b(?:play|stream|listen\s+to)\s+.+?\s+(?:on|in)\s+youtube\b", q, re.I) or \
+       re.search(r"\bsearch\s+(?:for\s+)?.+?\s+(?:on|in)\s+youtube\s+and\s+play\b", q, re.I) or \
+       re.search(r"\b(?:open|search|play).+?\b(?:song|track|music|video)\b", q, re.I):
+        return [q]
+
     parts = re.split(r"\s*(?:and\s+then|,\s*then|\s+then\s+|;)\s*", q, flags=re.I)
     if len(parts) > 1:
         return [p.strip() for p in parts if p.strip()]
@@ -2305,20 +2388,68 @@ class DodaiosToolHub:
                 "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
                 "Accept-Language": "en-US,en;q=0.9"
             })
-            html = urllib.request.urlopen(req, timeout=4.5).read().decode("utf-8", errors="ignore")
-            vids_json = re.findall(r'\"videoId\":\"([a-zA-Z0-9_-]{11})\"', html)
-            vids_watch = re.findall(r"/watch\?v=([a-zA-Z0-9_-]{11})", html)
-            seen = set()
-            candidate_vids = []
-            for v in (vids_json + vids_watch):
-                if v and v not in seen:
-                    seen.add(v)
-                    candidate_vids.append(v)
-            if candidate_vids:
-                vid_id = candidate_vids[0]
-                play_url = f"https://www.youtube.com/watch?v={vid_id}&autoplay=1"
+            html = urllib.request.urlopen(req, timeout=5.0).read().decode("utf-8", errors="ignore")
+            
+            chosen_vid = ""
+            chosen_title = ""
+            
+            # 1. Parse ytInitialData to extract authentic videoRenderer items (avoiding ads, shorts & promoted videos)
+            m_data = re.search(r"var ytInitialData\s*=\s*({.+?});</script>", html)
+            if m_data:
+                try:
+                    yt_data = json.loads(m_data.group(1))
+                    candidates = []
+                    def find_renderers(obj):
+                        if isinstance(obj, dict):
+                            if "videoRenderer" in obj:
+                                vr = obj["videoRenderer"]
+                                vid_id = vr.get("videoId")
+                                title = ""
+                                if "title" in vr and "runs" in vr["title"] and vr["title"]["runs"]:
+                                    title = vr["title"]["runs"][0].get("text", "")
+                                if vid_id and title:
+                                    candidates.append((vid_id, title))
+                            for v in obj.values():
+                                find_renderers(v)
+                        elif isinstance(obj, list):
+                            for item in obj:
+                                find_renderers(item)
+                    find_renderers(yt_data)
+                    
+                    if candidates:
+                        q_words = [w.lower() for w in clean_q.split() if len(w) > 2]
+                        best_vid = candidates[0][0]
+                        best_title = candidates[0][1]
+                        best_score = -1
+                        for vid_id, v_title in candidates[:8]:
+                            v_lower = v_title.lower()
+                            score = sum(1 for w in q_words if w in v_lower)
+                            if score > best_score:
+                                best_score = score
+                                best_vid = vid_id
+                                best_title = v_title
+                        chosen_vid = best_vid
+                        chosen_title = best_title
+                except Exception as e:
+                    print(f"[YouTube ytInitialData Parse Error] {e}", flush=True)
+
+            # 2. Fallback if JSON parse fails: Regex watch links
+            if not chosen_vid:
+                vids_watch = re.findall(r"/watch\?v=([a-zA-Z0-9_-]{11})", html)
+                seen = set()
+                candidate_vids = []
+                for v in vids_watch:
+                    if v and v not in seen:
+                        seen.add(v)
+                        candidate_vids.append(v)
+                if candidate_vids:
+                    chosen_vid = candidate_vids[0]
+
+            if chosen_vid:
+                play_url = f"https://www.youtube.com/watch?v={chosen_vid}&autoplay=1"
                 subprocess.Popen([CHROMIUM_BIN, play_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-                return True, f"Playing {clean_q.title()} on tab."
+                disp_title = chosen_title if chosen_title else clean_q.title()
+                return True, f"Playing {disp_title} on tab."
         except Exception as e:
             print(f"[YouTube Direct Play Error] {e}", flush=True)
 
@@ -3848,8 +3979,11 @@ class DodaiosToolHub:
     def save_note(self, title: str, content: str, category: str = "General") -> str:
         """Saves a styled markdown note document to ~/Documents/Notes."""
         NOTES_DIR.mkdir(parents=True, exist_ok=True)
-        safe_title = "".join(c for c in title if c.isalnum() or c in "_- ").strip().replace(" ", "_") or "note"
-        path = NOTES_DIR / f"{safe_title}.md"
+        if title.endswith(".txt") or title.endswith(".md"):
+            path = NOTES_DIR / title
+        else:
+            safe_title = "".join(c for c in title if c.isalnum() or c in "_- ").strip().replace(" ", "_") or "note"
+            path = NOTES_DIR / f"{safe_title}.md"
         date_str = time.strftime('%Y-%m-%d %H:%M:%S')
         note_body = (
             f"# {title.strip()}\n"
@@ -5775,7 +5909,12 @@ class AudioVoiceEngine(QObject):
             return ("I'm listening.", "Status: Ready", "")
 
         # 0a0. Open Settings / Configuration Window Fast Path
-        if any(p in q_lower for p in ["open settings", "open config", "open configuration", "settings", "configure models", "model settings", "setup models", "models tab", "api key"]):
+        is_close_or_min = any(w in q_lower for w in ["close", "kill", "exit", "quit", "shut", "minimize", "minimise", "hide"])
+        is_system_settings = any(w in q_lower for w in ["system settings", "system setting", "kde settings", "plasma settings"])
+        if not is_close_or_min and not is_system_settings and (
+            any(p in q_lower for p in ["open settings", "open config", "open configuration", "configure models", "model settings", "setup models", "models tab", "api key"]) or
+            q_lower.strip() in ["settings", "config", "configuration", "open setup"]
+        ):
             self.open_config_requested.emit()
             return ("Opened configuration.", "Config: Opened", "")
 
@@ -6094,8 +6233,8 @@ class AudioVoiceEngine(QObject):
             return (cap, "Capabilities: Offline", "")
 
         # 0g. Offline Local File Operations (Create, Read, List, Delete)
-        if any(p in q_lower for p in ["create file", "create a file", "make a file", "write a file"]):
-            cf_m = re.search(r"(?:called|named|titled|save\s+(?:it\s+)?as|name\s+it|file)?\s*([a-zA-Z0-9_\-.]+)\s*(?:with\s+(?:content|text|saying)|:)\s*(.+)$", q_clean, re.I)
+        if any(p in q_lower for p in ["create file", "create a file", "make a file", "write a file", "create note", "create a note"]):
+            cf_m = re.search(r"(?:called|named|titled|save\s+(?:it\s+)?as|name\s+it|file|note)?\s*([a-zA-Z0-9_\-.]+)\s*(?:with\s+(?:content|text|saying)|content\s+|text\s+|:)\s*(.+)$", q_clean, re.I)
             if cf_m:
                 fn = cf_m.group(1).strip()
                 fc = cf_m.group(2).strip()
@@ -6107,7 +6246,7 @@ class AudioVoiceEngine(QObject):
                     self.last_generated_file = str(target_f)
                     self.tool_hub.last_created_file = str(target_f)
                     save_last_created_file_metadata(str(target_f))
-                    return (f"Created file '{fn}' in {out_file.parent}. Say 'open it' or 'open {fn}' to view it.", f"File: Created ({fn})", str(target_f))
+                    return (f"Created file '{fn}' in {target_f.parent}. Say 'open it' or 'open {fn}' to view it.", f"File: Created ({fn})", str(target_f))
                 except Exception as e:
                     return (f"Failed to create file: {e}", "File: Error", "")
 
@@ -6131,6 +6270,10 @@ class AudioVoiceEngine(QObject):
                     target_f = docs_dir / fn
                     if not target_f.exists():
                         target_f = docs_dir / "Notes" / fn
+                    if not target_f.exists():
+                        cands = list(docs_dir.glob(f"*{fn}*")) + list((docs_dir / "Notes").glob(f"*{fn}*"))
+                        if cands:
+                            target_f = cands[0]
                 if target_f.exists() and target_f.is_file():
                     try:
                         content_txt = target_f.read_text(encoding="utf-8")[:300]
@@ -6236,24 +6379,47 @@ class AudioVoiceEngine(QObject):
                 return (f"I don't have any saved memories matching '{target}'.", "Memory: Not Found", "")
 
         # 1. KWin DBus Window Management (Active & Targeted Sub-5ms Fast Path)
-        win_m = re.match(r"^(?:please\s+)?(close|minimize|maximize|fullscreen)\s+(?:the\s+)?([a-zA-Z0-9_\-\s]+)$", q_lower)
+        win_m = re.match(r"^(?:please\s+)?(close|minimize|minimise|maximize|maximise|fullscreen|restore|unminimize)\s*(?:the\s+|this\s+|current\s+|active\s+)?([a-zA-Z0-9_\-\s]*)$", q_lower)
         if win_m:
             act = win_m.group(1)
+            if act in ["minimise"]: act = "minimize"
+            if act in ["maximise"]: act = "maximize"
+            if act in ["unminimize"]: act = "restore"
             tgt = win_m.group(2).strip()
-            if tgt in ["window", "active window", "current window", "this", "screen"]:
-                if act == "close":
-                    kwin_shortcut("Window Close")
-                    return ("Closed window.", "Window: Close", "")
-                elif act == "minimize":
-                    kwin_shortcut("Window Minimize")
-                    return ("Minimized window.", "Window: Minimize", "")
-                elif act == "maximize":
-                    kwin_shortcut("Window Maximize")
-                    return ("Maximized window.", "Window: Maximize", "")
-                elif act == "fullscreen":
-                    kwin_shortcut("Window Fullscreen")
-                    return ("Fullscreened window.", "Window: Fullscreen", "")
+            if not tgt or tgt in [
+                "it", "this", "window", "this window", "active window", "current window", "the window",
+                "screen", "app", "application", "the app", "this app", "current app", "active app"
+            ]:
+                tgt = "window"
+
+            if tgt == "window":
+                kwin_manage_app_window("window", act)
                 return (f"{act.title()}d window.", f"Window: {act.title()}", "")
+            elif tgt in ["all", "everything", "all windows", "all apps", "all applications", "all software"]:
+                if act == "close":
+                    close_software_by_name("all")
+                    return ("Closed all application windows.", "App: Close All", "")
+                else:
+                    kwin_manage_app_window("all", act)
+                    return (f"{act.title()}d all windows.", f"Window: {act.title()} All", "")
+            elif tgt in ["all tabs", "all chromium tabs", "all browser tabs", "tabs", "all tab"]:
+                if act == "close":
+                    kwin_manage_app_window("chromium", "close")
+                    return ("Closed all tabs in Chromium.", "Chromium: All Tabs Closed", "")
+                else:
+                    return ("Tab management active.", "Chromium: Tabs", "")
+            elif tgt in ["tab", "current tab", "active tab", "this tab", "the tab"]:
+                if act == "close":
+                    ok, msg = self.tool_hub.close_chromium_tab()
+                    return (msg, "Chromium: Close Tab", "")
+                else:
+                    return ("Tab navigation active.", "Chromium: Tab", "")
+            elif tgt in ["void", "yourself", "assistant", "system ai"]:
+                if act == "close":
+                    self.terminate_requested.emit()
+                    return ("Closing VOID assistant.", "VOID: Exit", "")
+                else:
+                    return ("VOID assistant online.", "VOID: Status", "")
             elif tgt not in ["ollama", "void", "brain", "ai"]:
                 if act == "close":
                     close_software_by_name(tgt)
@@ -6263,15 +6429,18 @@ class AudioVoiceEngine(QObject):
                     return (f"{act.title()}d {tgt.title()}.", f"Window: {act.title()} {tgt.title()}", "")
 
         if any(p in q_lower for p in ["show desktop", "go to desktop", "minimize all"]):
-            kwin_shortcut("Show Desktop")
+            kwin_manage_app_window("all", "minimize")
             return ("Showing desktop.", "KWin: Show Desktop", "")
 
         # 1c1. Close / Delete Tab in Existing Chromium Window
         is_close_tab_cmd = bool(
-            re.search(r"\b(?:close|delete|remove)\s+(?:the\s+|a\s+|this\s+|current\s+)?tab(?:s)?(?:\s+in\s+chromium|\s+in\s+browser)?\b", q_lower) or
-            q_lower.strip() in ["close tab", "delete tab", "close current tab", "delete current tab", "close this tab", "delete this tab", "close tab in chromium"]
+            re.search(r"\b(?:close|delete|remove)\s+(?:the\s+|a\s+|this\s+|current\s+|all\s+)?tab(?:s)?(?:\s+in\s+chromium|\s+in\s+browser)?\b", q_lower) or
+            q_lower.strip() in ["close tab", "delete tab", "close current tab", "delete current tab", "close this tab", "delete this tab", "close tab in chromium", "close all tabs", "close tabs", "delete all tabs"]
         )
         if is_close_tab_cmd:
+            if any(w in q_lower for w in ["all tabs", "every tab", "all chromium tabs", "all browser tabs"]):
+                kwin_manage_app_window("chromium", "close")
+                return ("Closed all tabs in Chromium.", "Chromium: All Tabs Closed", "")
             ok, msg = self.tool_hub.close_chromium_tab()
             return (msg, "Chromium: Close Tab", "")
 
@@ -6363,6 +6532,8 @@ class AudioVoiceEngine(QObject):
             not is_mpris_transport and (
                 any(w in q_lower for w in ["youtube"]) or
                 re.search(r"\b(?:open\s+)?youtube(?:\s+in\s+chromium)?\s+(?:and\s+)?play\b", q_lower) or
+                re.search(r"\bsearch\s+(?:for\s+)?(?:the\s+)?song\b", q_lower) or
+                re.search(r"\b(?:open\s+chromium\s+and\s+)?play\s+.+?\s+song\b", q_lower) or
                 bool(re.search(r"^(?:please\s+|can\s+you\s+)?(?:play|stream|listen\s+to|put\s+on|queue\s+up)\s+(?!music$|playback$)[a-zA-Z0-9_\-\s]+", q_lower)) or
                 bool(re.search(r"\b(?:pesamalaye|believer)\b", q_lower) and not any(w in q_lower for w in ["file", "document", "pdf", "folder", "app", "terminal"]))
             )
@@ -6375,13 +6546,14 @@ class AudioVoiceEngine(QObject):
                 if extracted_song.lower().strip() in ["psa", "pisa", "paisa malay", "paisal malay", "pesamale", "pesa malaye", "pesamalai"]:
                     extracted_song = "pesamalaye"
                 ok, msg = self.tool_hub.play_youtube_query(extracted_song)
-                return (f"Playing {extracted_song.title()} on tab.", f"YouTube: {extracted_song[:16]}", "")
+                return (msg, f"YouTube: {extracted_song[:16]}", "")
 
         yt_play_match = (
             re.search(r"(?:open\s+)?youtube(?:\s+in\s+chromium)?\s+and\s+search(?:\s+for)?\s+(.+?)(?:\s+and\s+play(?:\s+it)?|$)", q_lower) or
             re.search(r"search(?:\s+for)?\s+(.+?)\s+on\s+youtube\s+and\s+play(?:\s+it)?", q_lower) or
+            re.search(r"search\s+(?:for\s+)?(?:the\s+)?song\s+(.+?)(?:\s+and\s+play(?:\s+it)?|$)", q_lower) or
             re.search(r"play\s+(.+?)\s+(?:on|in)\s+youtube", q_lower) or
-            re.search(r"play\s+(.+?)\s+song(?:\s+on\s+youtube)?", q_lower) or
+            re.search(r"(?:open\s+chromium\s+and\s+)?play\s+(.+?)\s+song(?:\s+(?:on|in)\s+youtube)?", q_lower) or
             re.search(r"youtube\s+(?:play|search)\s+(.+)", q_lower)
         )
         if yt_play_match:
@@ -6391,7 +6563,7 @@ class AudioVoiceEngine(QObject):
                 if yt_query.lower().strip() in ["psa", "pisa", "paisa malay", "paisal malay", "pesamale", "pesa malaye", "pesamalai"]:
                     yt_query = "pesamalaye"
                 ok, msg = self.tool_hub.play_youtube_query(yt_query)
-                return (f"Playing {yt_query.title()} on tab.", f"YouTube: {yt_query[:16]}", "")
+                return (msg, f"YouTube: {yt_query[:16]}", "")
 
         # 1b2. Screen Identification & Object Clicking
         click_m = (
@@ -6917,6 +7089,9 @@ if __name__ == "__main__":
         close_m = re.match(r"^(?:please\s+)?(?:close|kill|quit|exit)\s+(?:the\s+)?([a-zA-Z0-9_\-\s]+)$", q_lower)
         if close_m:
             app = close_m.group(1).strip()
+            if app in ["void", "yourself", "assistant", "system ai"]:
+                self.terminate_requested.emit()
+                return ("Closing VOID assistant.", "VOID: Exit", "")
             if app not in ["window", "active window", "current window", "this", "ollama", "brain", "ai"]:
                 close_software_by_name(app)
                 return (f"Closed {app.title()}.", f"App: Close {app.title()}", "")
