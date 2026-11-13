@@ -5037,8 +5037,8 @@ class AudioVoiceEngine(QObject):
 
             try:
                 from dodaios.plugins.tts.piper_local import PiperLocalTTS
-                self._tts = PiperLocalTTS(voice="vits-piper-en_US-ryan-medium", speed=1.0)
-                print("[VOID Audio] Piper neural TTS ready (speed=1.0).")
+                self._tts = PiperLocalTTS(voice="vits-piper-en_US-ryan-medium", speed=0.92)
+                print("[VOID Audio] Piper neural TTS ready (calibrated calm cadence speed=0.92).")
             except Exception as e:
                 print(f"[VOID Audio Warning] Piper load: {e}")
 
@@ -7976,19 +7976,23 @@ if __name__ == "__main__":
         s = re.sub(r"[\U00010000-\U0010ffff]", "", s)
         s = re.sub(r"[⏱️🎧💭💬💙🎉💫☀️🌙🌤️➔✕●⏺⏹✅⚙️🔍🔄🛑🚫⚠️❌📊><:=+/\\]", " ", s)
 
+        # Convert newlines and bullet items into natural sentence pauses
+        s = re.sub(r"([a-zA-Z0-9])\s*\n+\s*", r"\1. ", s)
+        s = re.sub(r"\n+", " ", s)
+
         # Normalize whitespace and ensure a clean pause between sentences
         s = re.sub(r"\s+", " ", s).strip()
         s = re.sub(r"\?\s*", "? ", s)
 
         # Regulate long text responses for speech synthesis:
-        # Extract the first 2 clear sentences or first complete natural clause block
-        if len(s) > 180:
+        # For large text, extract up to the first 3 clear articulate sentences (or up to 240 chars)
+        if len(s) > 220:
             sentences = re.split(r"(?<=[.!?])\s+", s)
-            if len(sentences) > 2:
-                s = " ".join(sentences[:2]).strip()
+            if len(sentences) > 3:
+                s = " ".join(sentences[:3]).strip()
             elif len(sentences) == 1:
-                # Text has no sentence terminators: split at comma or natural conjunction near 160 chars
-                clause_m = re.match(r"^(.{100,180}?)(?:[,;:]|\s+(?:and|but|while|which|with|that)\s+)", s, re.I)
+                # Text has no sentence terminators: split at comma or natural conjunction near 180 chars
+                clause_m = re.match(r"^(.{120,200}?)(?:[,;:]|\s+(?:and|but|while|which|with|that)\s+)", s, re.I)
                 if clause_m:
                     s = clause_m.group(1).strip() + "."
 
@@ -8140,19 +8144,22 @@ if __name__ == "__main__":
         if self._tts is None:
             try:
                 from dodaios.plugins.tts.piper_local import PiperLocalTTS
-                self._tts = PiperLocalTTS(voice="vits-piper-en_US-ryan-medium", speed=1.0)
+                self._tts = PiperLocalTTS(voice="vits-piper-en_US-ryan-medium", speed=0.92)
                 print("[VOID Audio] Piper neural TTS initialized lazily.", flush=True)
             except Exception as e:
                 print(f"[VOID TTS Load Error] {e}", flush=True)
                 return
 
         # Dynamically regulate TTS speed based on text length:
-        # Long/detailed responses adopt a calm, articulate 0.95x pace to eliminate rushing/over-speeding.
+        # Large text/language adopts a calm, articulate pace (0.86 - 0.89x) to completely eliminate over-speeding.
         if self._tts is not None:
-            if len(clean) > 130:
-                self._tts._speed = 0.95
+            word_count = len(clean.split())
+            if word_count > 35 or len(clean) > 180:
+                self._tts._speed = 0.86
+            elif word_count > 15 or len(clean) > 80:
+                self._tts._speed = 0.89
             else:
-                self._tts._speed = 1.00
+                self._tts._speed = 0.92
 
         self._is_speaking = True
         self.state_changed.emit("speaking")
