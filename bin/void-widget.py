@@ -1865,8 +1865,8 @@ def normalize_voice_intent(text: str) -> str:
         (r"\b(?:pfd|predf|pe-df)\b", "pdf"),
 
         (r"\b(?:strt|strat|stert|starr)\b", "start"),
-        (r"\b(?:wide|k[- ]?void|k[- ]?wide|white|hay\s+white|hey\s+white)\s+(?:off[- ]?road|off[- ]?load(?:ing)?|offload|load|oad)\b", "offload"),
-        (r"\b(?:off[- ]?road|off[- ]?load(?:ing)?|off[- ]?lad|of[- ]?load|oad)\s+(?:the\s+)?models?\b", "offload model"),
+        (r"\b(?:wide|k[- ]?void|k[- ]?wide|white|hay\s+white|hey\s+white)\s+(?:off[- ]?road|off[- ]?load(?:ing)?|offload|offlad)\b", "offload"),
+        (r"\b(?:off[- ]?road|off[- ]?load(?:ing)?|off[- ]?lad|of[- ]?load|(?<!l)oad)\s+(?:the\s+)?models?\b", "offload model"),
         (r"\b(?:word\s+load\s+model|word\s+model)\b", "load model"),
         (r"\b(?:off\s+loading\s+model)\b", "offload model"),
         (r"\b(?:off[- ]?road|off[- ]?lad|of[- ]?load|oad)\b", "offload"),
@@ -5718,41 +5718,30 @@ class AudioVoiceEngine(QObject):
             self.open_config_requested.emit()
             return ("Opened configuration.", "Config: Opened", "")
 
-        # 0a. Stop & Offload Models Fast Path (Completely stops Ollama server, frees RAM, and terminates connectivity)
-        is_offload_cmd = (
-            any(p in q_lower for p in [
-                "offload model", "off-load model", "off load model", "off loading model", "offloading model",
-                "off-road model", "off road model", "oad model", "offlad model", "unload model", "stop model",
-                "stop models", "stop ollama", "stop the ollama", "kill ollama", "shut down ollama", "shutdown ollama",
-                "free ram", "free memory", "free vram", "offload the model", "unload the model", "off-load the model",
-                "off load the model", "offload all models", "unload all models", "stop offload model", "stop, offload model",
-                "stop and offload model", "offload brain", "unload brain", "stop local model", "offload local model",
-                "unload local model", "free system memory", "deactivate model"
-            ]) or
-            bool(re.search(r"\b(?:stop\s*,?\s*(?:and\s+)?off[- ]?load|off[- ]?load(?:ing)?|off[- ]?road|offlad|unload|stop)\s+(?:the\s+)?(?:models?|brain|ai|local\s+model|ollama(?:\s+server)?)\b", q_lower)) or
-            bool(re.search(r"\b(?:oad|off[- ]?road)\s+models?\b", q_lower)) or
-            bool(re.search(r"\b(?:free|clear|release)\s+(?:up\s+)?(?:ram|vram|memory|system\s+memory)\b", q_lower)) or
-            any(q_lower.endswith(s) for s in ["offload model", "off-load model", "off load model", "oad model", "offlad model", "off-road model"])
-        )
-        if is_offload_cmd:
-            self.cancel_active_task()
-            self._pending_action = None
-            self._offload_and_stop_ollama()
-            reply_msg = "Ollama server stopped, model offloaded, and RAM freed."
-            return (reply_msg, "Model: Offloaded", "")
-
-        # 0a1. Start / Load Model & Resume Ollama Fast Path
+        # 0a1. Start / Load Model & Resume Ollama Fast Path (Prioritized to avoid false offload triggers)
         is_start_model_cmd = (
-            any(p in q_lower for p in [
-                "start model", "start model again", "start the model", "start the model again",
-                "start ollama", "start ollama again", "start the ollama", "start local model",
-                "load model", "load the model", "load models", "reload model", "resume model",
-                "turn on model", "turn on ollama", "turn on the model", "activate model",
-                "reconnect model", "enable model", "start ai model", "wake model",
-                "word load model", "word load", "word model"
-            ]) or
-            bool(re.search(r"\b(?:start|load|reload|resume|activate|turn\s+on|enable)\s+(?:the\s+)?(?:models?|local\s+model|brain|ollama(?:\s+server)?)\b", q_lower)) or
-            bool(re.search(r"\b(?:start|load)\s+(?:the\s+)?models?\s+again\b", q_lower))
+            (
+                bool(re.search(
+                    r"\b(?:start|(?<!off[- ])(?<!un)load|reload|resume|activate|turn\s+on|enable|boot|launch|run|wake|reconnect)\s+(?:the\s+)?(?:models?|local\s+model|brain|ai(?:\s+model)?|ollama(?:\s+server)?)\b",
+                    q_lower
+                )) or
+                bool(re.search(r"\b(?:start|(?<!off[- ])(?<!un)load|reload|resume|activate)\s+(?:the\s+)?(?:models?|brain|ollama)\s+(?:again|back|up)\b", q_lower)) or
+                bool(re.search(r"\b(?:bring|put|turn)\s+(?:the\s+)?(?:models?|ollama)\s+(?:back|online)\b", q_lower)) or
+                bool(re.search(r"\b(?:bring\s+back)\s+(?:the\s+)?(?:models?|ollama|brain)\b", q_lower)) or
+                any(p == q_lower.strip(" .!?") for p in [
+                    "start model", "start model again", "start the model", "start the model again",
+                    "start ollama", "start ollama again", "start the ollama", "start ollama server", "start the ollama server",
+                    "start local model", "run ollama", "run ollama server", "launch ollama", "boot ollama", "boot model",
+                    "load model", "load the model", "load models", "load ollama", "load the ollama", "load ollama server",
+                    "reload model", "reload ollama", "resume model", "resume ollama",
+                    "turn on model", "turn on ollama", "turn on the model", "turn on the ollama", "activate model", "activate ollama",
+                    "reconnect model", "reconnect ollama", "enable model", "enable ollama", "start ai model", "wake model", "wake brain",
+                    "start brain", "load brain", "word load model", "word load", "word model"
+                ]) or
+                any(q_lower.startswith(p) for p in [
+                    "start model with ", "load model ", "start ollama with ", "run ollama with "
+                ])
+            ) and not bool(re.search(r"\b(?:off[- ]?load(?:ing)?|off[- ]?road|offlad|unload|stop|kill|shut[- ]?down)\b", q_lower))
         )
         if is_start_model_cmd:
             self.cancel_active_task()
@@ -5764,6 +5753,37 @@ class AudioVoiceEngine(QObject):
                 return ("Ollama server started and model is online.", "Model: Online", "")
             else:
                 return (f"Failed to start Ollama: {msg}", "Model: Error", "")
+
+        # 0a2. Stop & Offload Models Fast Path (Completely stops Ollama server, frees RAM, and terminates connectivity)
+        is_offload_cmd = (
+            not is_start_model_cmd and (
+                bool(re.search(
+                    r"\b(?:stop|off[- ]?load(?:ing)?|off[- ]?road|offlad|unload|kill|shut[- ]?down|deactivate|turn\s+off)\s+(?:the\s+)?(?:models?|local\s+model|brain|ai(?:\s+model)?|ollama(?:\s+server)?)\b",
+                    q_lower
+                )) or
+                bool(re.search(r"\b(?:stop\s*,?\s*(?:and\s+)?off[- ]?load)\s+(?:the\s+)?(?:models?|brain|ai|local\s+model|ollama(?:\s+server)?)\b", q_lower)) or
+                bool(re.search(r"\b(?:free|clear|release)\s+(?:up\s+)?(?:ram|vram|memory|system\s+memory)\b", q_lower)) or
+                bool(re.search(r"\b(?:take|put|turn)\s+(?:the\s+)?(?:models?|ollama)\s+offline\b", q_lower)) or
+                any(p == q_lower.strip(" .!?") for p in [
+                    "offload model", "off-load model", "off load model", "off loading model", "offloading model",
+                    "off-road model", "off road model", "offlad model", "unload model", "stop model",
+                    "stop models", "stop ollama", "stop the ollama", "stop ollama server", "kill ollama",
+                    "shut down ollama", "shutdown ollama", "turn off ollama", "turn off model",
+                    "free ram", "free memory", "free vram", "free system memory",
+                    "offload the model", "unload the model", "off-load the model", "off load the model",
+                    "offload all models", "unload all models", "stop offload model", "stop and offload model",
+                    "offload brain", "unload brain", "stop local model", "offload local model",
+                    "unload local model", "deactivate model", "deactivate ollama"
+                ]) or
+                (bool(re.search(r"\b(?<!l)oad\s+models?\b", q_lower)) and not bool(re.search(r"\bload\s+models?\b", q_lower)))
+            )
+        )
+        if is_offload_cmd:
+            self.cancel_active_task()
+            self._pending_action = None
+            self._offload_and_stop_ollama()
+            reply_msg = "Ollama server stopped, model offloaded, and RAM freed."
+            return (reply_msg, "Model: Offloaded", "")
 
         # 0a. Voice Abort / Stop Command
         if q_lower in ["stop", "cancel", "abort", "shut up", "stop talking", "stop thinking"]:
