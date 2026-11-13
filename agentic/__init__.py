@@ -25,7 +25,7 @@ from agentic.supervisor import SupervisorAgent
 from agentic.memory import AgentMemoryManager
 from agentic.audit import AuditLogger
 from agentic.demos import CompetitionDemos
-from agentic.ui_components import AgentActivityCard, CompactExecutionPopup, SystemInfoPopup
+from agentic.ui_components import AgentActivityCard, CompactExecutionPopup, SystemInfoPopup, VoidConfigWindow
 
 __all__ = [
     "AgentRole",
@@ -52,4 +52,5 @@ __all__ = [
     "AgentActivityCard",
     "CompactExecutionPopup",
     "SystemInfoPopup",
+    "VoidConfigWindow",
 ]

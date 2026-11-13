@@ -81,7 +81,11 @@ class PlannerAgent(BaseAgent):
         elif any(kw in goal_lower for kw in ("scaffold", "write code", "fix bug", "run tests", "unit test", "develop", "debug python")):
             tasks = self._plan_software_dev(plan_id, goal, context)
 
-        # Domain Pattern 8: General Multi-Step Fallback via AI Provider or Safe DAG
+        # Domain Pattern 8: Technical Research & DOCX Authoring
+        elif any(kw in goal_lower for kw in ("research", "conduct research", "docx report", "executive report", "demo 3")):
+            tasks = self._plan_research_workflow(plan_id, goal, context)
+
+        # Domain Pattern 9: General Multi-Step Fallback via AI Provider or Safe DAG
         else:
             tasks = self._plan_with_ai_fallback(plan_id, goal)
 

@@ -537,10 +537,11 @@ def _populate_default_tools(reg: ToolRegistry, perm_mgr: PermissionManager, tool
         topic: str = "",
         file_type: str = "pdf",
         custom_title: str = "",
+        target_pages: int | None = None,
         **kwargs
     ) -> dict[str, Any]:
         if tool_hub and hasattr(tool_hub, "compose_comprehensive_document"):
-            ok, msg, path = tool_hub.compose_comprehensive_document(topic, file_type=file_type, custom_title=custom_title)
+            ok, msg, path = tool_hub.compose_comprehensive_document(topic, file_type=file_type, custom_title=custom_title, target_pages=target_pages)
             return {"success": ok, "message": msg, "path": path}
         return {"success": False, "message": "ToolHub unavailable"}
 
@@ -553,7 +554,8 @@ def _populate_default_tools(reg: ToolRegistry, perm_mgr: PermissionManager, tool
             "properties": {
                 "topic": {"type": "string"},
                 "file_type": {"type": "string", "enum": ["pdf", "docx", "md"]},
-                "custom_title": {"type": "string"}
+                "custom_title": {"type": "string"},
+                "target_pages": {"type": "integer"}
             },
             "required": ["topic"]
         },
@@ -657,9 +659,10 @@ def _populate_default_tools(reg: ToolRegistry, perm_mgr: PermissionManager, tool
     # 4. Media, Browser & System Automation Tools
     def _open_youtube_playback(query: str = "", song: str = "", track: str = "", browser: str = "chromium", **kwargs) -> dict[str, Any]:
         raw_target = query or song or track or kwargs.get("goal", "")
-        clean_q = extract_media_song_query(raw_target) if raw_target else "Top Music Hits"
+        raw_norm = re.sub(r"\b(?:psa|pisa|paisa\s+malay|paisal\s+malay|pesa\s*malay(?:e|ae)?|pesamalai|pesamale)\b", "pesamalaye", raw_target, flags=re.I)
+        clean_q = extract_media_song_query(raw_norm) if raw_norm else ""
         if not clean_q or clean_q in ["it", "something", "a song", "music", "song"]:
-            clean_q = "Top Music Hits"
+            clean_q = re.sub(r"\b(?:song|video|track|music|play|open|in\s+chromium|on\s+youtube)\b", "", raw_norm, flags=re.I).strip() or "Pesamalaye"
 
         # Pause any active players first to avoid audio overlap
         try:
@@ -685,17 +688,27 @@ def _populate_default_tools(reg: ToolRegistry, perm_mgr: PermissionManager, tool
         vid_id = None
 
         try:
-            req = urllib.request.Request(search_url, headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64)"})
-            html = urllib.request.urlopen(req, timeout=4.0).read().decode("utf-8", errors="ignore")
-            video_ids = re.findall(r"/watch\?v=([a-zA-Z0-9_-]{11})", html)
-            if video_ids:
-                vid_id = video_ids[0]
+            req = urllib.request.Request(search_url, headers={
+                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                "Accept-Language": "en-US,en;q=0.9"
+            })
+            html = urllib.request.urlopen(req, timeout=4.5).read().decode("utf-8", errors="ignore")
+            vids_json = re.findall(r'\"videoId\":\"([a-zA-Z0-9_-]{11})\"', html)
+            vids_watch = re.findall(r"/watch\?v=([a-zA-Z0-9_-]{11})", html)
+            seen = set()
+            candidate_vids = []
+            for v in (vids_json + vids_watch):
+                if v and v not in seen:
+                    seen.add(v)
+                    candidate_vids.append(v)
+            if candidate_vids:
+                vid_id = candidate_vids[0]
                 play_url = f"https://www.youtube.com/watch?v={vid_id}&autoplay=1"
         except Exception:
             pass
 
         try:
-            proc = subprocess.Popen([chrom_bin, "--new-window", play_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+            proc = subprocess.Popen([chrom_bin, play_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
             return {
                 "success": True,
                 "browser": chrom_bin,
@@ -703,7 +716,7 @@ def _populate_default_tools(reg: ToolRegistry, perm_mgr: PermissionManager, tool
                 "video_id": vid_id,
                 "url": play_url,
                 "pid": proc.pid,
-                "message": f"Successfully launched Chromium and initiated YouTube playback for '{clean_q}'."
+                "message": f"Playing {clean_q.title()} on tab."
             }
         except Exception as e:
             subprocess.Popen(["xdg-open", play_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)

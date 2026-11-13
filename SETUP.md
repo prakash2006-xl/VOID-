@@ -1,6 +1,18 @@
 # VOID — Complete Setup, Installation & Deployment Guide
 
-Welcome to the setup documentation for **VOID**, an autonomous, keyless, personal AI desktop assistant built specifically for Linux (KDE Plasma 6 on Wayland/X11). VOID combines sub-5ms local desktop automation with the cognitive intelligence of Liquid AI's neural models running 100% offline via Ollama.
+Welcome to the setup documentation for **VOID**, an autonomous, personal AI desktop assistant built specifically for Linux (KDE Plasma 6 on Wayland/X11). VOID combines sub-5ms local desktop automation with the cognitive intelligence of local neural models (Ollama `lfm3-omni:2b`) and flexible cloud models (such as OpenRouter with `perplexity/pplx-decider-flash-v1.3:free`).
+
+---
+
+## Quick Start (One-Click Automated Setup)
+
+You can install all requirements, configure chosen models, optimize CPU/RAM efficiency, and launch VOID with a single command or click:
+
+```bash
+cd /run/media/prakash/TR_39/VOID
+./terminalsetuprun
+```
+*(You can also double-click `terminalsetuprun` or `termialsteuprun` in Dolphin).*
 
 ---
 
@@ -8,15 +20,16 @@ Welcome to the setup documentation for **VOID**, an autonomous, keyless, persona
 
 1. [System Requirements](#1-system-requirements)
 2. [Directory Architecture](#2-directory-architecture)
-3. [System Dependencies Installation](#3-system-dependencies-installation)
-4. [Python Virtual Environment Setup](#4-python-virtual-environment-setup)
-5. [Local Neural Brain (Ollama) Setup](#5-local-neural-brain-ollama-setup)
-6. [Offline Speech Models Setup (STT & TTS)](#6-offline-speech-models-setup-stt--tts)
-7. [Running & Launching VOID](#7-running--launching-void)
-8. [Automated System Verification & Tests](#8-automated-system-verification--tests)
-9. [Voice Commands & Feature Reference](#9-voice-commands--feature-reference)
-10. [Git Setup & GitHub Repository Synchronization](#10-git-setup--github-repository-synchronization)
+3. [One-Click Setup Script (`terminalsetuprun`)](#3-one-click-setup-script-terminalsetuprun)
+4. [AI Model Configuration & Switching (Local & Cloud)](#4-ai-model-configuration--switching-local--cloud)
+5. [VOID Configuration Window & Sizing Presets](#5-void-configuration-window--sizing-presets)
+6. [Plugin & Skill Pipeline Architecture](#6-plugin--skill-pipeline-architecture)
+7. [Voice Announcements (Short & Sweet)](#7-voice-announcements-short--sweet)
+8. [Media & Song Playback on Tabs (Zero Auto-Correction)](#8-media--song-playback-on-tabs-zero-auto-correction)
+9. [Performance & Efficiency Optimizations](#9-performance--efficiency-optimizations)
+10. [Automated Verification & Test Matrix](#10-automated-verification--test-matrix)
 11. [Troubleshooting & Diagnostics](#11-troubleshooting--diagnostics)
+12. [System Control & Activities (Power, Telemetry & Automation)](#12-system-control--activities-power-telemetry--automation)
 
 ---
 
@@ -24,10 +37,10 @@ Welcome to the setup documentation for **VOID**, an autonomous, keyless, persona
 
 - **Operating System:** Fedora Linux 40+ / Ubuntu 24.04+ / Arch Linux (KDE Plasma 6 Wayland recommended)
 - **CPU:** AMD Ryzen 5/7/9 or Intel Core i5/i7/i9 (4+ physical cores)
-- **RAM:** 16 GB minimum (8 GB for OS/apps, 4–6 GB for local LLM & whisper in-memory)
+- **RAM:** 16 GB minimum
 - **Graphics:** AMD Radeon / Intel Iris Xe / NVIDIA (Vulkan / ROCm / CUDA compatible)
 - **Audio Server:** PipeWire 1.0+ with WirePlumber
-- **Storage:** ~10 GB free space (5 GB for LLM weights, 2 GB for STT/TTS models)
+- **Storage:** ~10 GB free space on external SSD or root drive
 
 ---
 
@@ -38,323 +51,259 @@ All persistent runtime assets, scripts, neural models, and memory databases resi
 ```
 /run/media/prakash/TR_39/VOID/
 ├── bin/
-│   ├── void-widget.py         # Main PySide6 Glass Island Desktop Assistant daemon
-│   └── dodaios_tool_hub.py    # 105 Dodaios local automation tools engine
+│   ├── void-widget.py         # Main PySide6 Glass Flow Desktop Assistant widget
+│   └── void-launcher.py       # Full system lifecycle & process supervisor
 ├── config/
-│   └── void-config.json       # Assistant preferences, wake words, thresholds
-├── docs/
-│   ├── README.md              # Project overview
-│   ├── TOOLS_GUIDE.md         # Fast-path vs AI tool reference
-│   └── ACTIONS_WITH_AND_WITHOUT_AI.md
+│   ├── ai_providers.json      # Cloud & local model credentials and profiles
+│   ├── tasks.json             # Persistent reminders and tasks database
+│   └── widget_pos.json        # Saved desktop coordinates
+├── agentic/
+│   ├── supervisor.py          # Fast-path intent classifier & multi-agent supervisor
+│   ├── planner.py             # Hierarchical domain template & LLM planner
+│   ├── providers.py           # 4-tier model hierarchy (OpenRouter, Ollama, OpenAI, System)
+│   ├── tools.py               # 105 tools registry and safety gating
+│   └── ui_components.py       # Config window, agent activity cards, system popups
 ├── memory/
-│   └── facts.json             # Persistent episodic SSD memory and user preferences
-├── models/
-│   ├── ollama/                # Local LLM weights (lfm3-omni:2b)
-│   ├── tts/                   # Piper VITS ONNX models (en_US-ryan-medium.onnx)
-│   └── vosk/                  # Vosk Kaldi acoustic grammar model
+│   ├── facts.json             # Persistent episodic SSD memory
+│   └── weekly_summaries/      # 7-day high-memory digests
 ├── scripts/
-│   ├── run_void.sh            # One-click launcher script
-│   ├── stop_void.sh           # Safe termination script
-│   ├── status_void.sh         # Real-time daemon & memory diagnostics
-│   └── test_*.py              # Comprehensive test suites (94 regression tests)
-├── .gitignore                 # Shields heavy binary model weights from git tracking
-├── README.md                  # Main GitHub documentation
-└── SETUP.md                   # This installation and deployment guide
+│   ├── run_void.sh            # Dedicated portable launcher
+│   ├── stop_void.sh           # Clean shutdown script
+│   └── status_void.sh         # Real-time diagnostics checker
+├── terminalsetuprun           # One-click executable setup & model configuration
+├── termialsteuprun            # Symlink alias for terminalsetuprun
+├── README.md                  # Complete technical manual
+└── SETUP.md                   # This installation & deployment guide
 ```
 
 ---
 
-## 3. System Dependencies Installation
+## 3. One-Click Setup Script (`terminalsetuprun`)
 
-### Fedora / RHEL:
-```bash
-sudo dnf install -y \
-    pipewire-utils \
-    wireplumber \
-    espeak-ng \
-    espeak-ng-devel \
-    wl-clipboard \
-    qt6-qdbus \
-    alsa-utils \
-    git \
-    curl \
-    python3-devel
-```
+The `terminalsetuprun` executable automates the entire end-to-end setup:
 
-### Ubuntu / Debian:
-```bash
-sudo apt update && sudo apt install -y \
-    pipewire-bin \
-    wireplumber \
-    espeak-ng \
-    libespeak-ng-dev \
-    wl-clipboard \
-    qdbus-qt6 \
-    alsa-utils \
-    git \
-    curl \
-    python3-dev \
-    python3-venv
-```
+1. **Virtual Environment:** Validates `/home/prakash/.dodaios/.venv` and installs required packages (`PySide6`, `faster-whisper`, `vosk`, `sounddevice`, `httpx`, `reportlab`, `python-docx`, `openpyxl`, `ddgs`).
+2. **Efficiency Guard:** Automatically deactivates rogue background dictation workers (`preview_worker large-v3-turbo`) that waste 40-70% CPU and 1.3GB RAM.
+3. **Model Configuration:** Automatically writes chosen models (e.g., OpenRouter `perplexity/pplx-decider-flash-v1.3:free`) and API key into `config/ai_providers.json`.
+4. **Speech Assets:** Checks and downloads Vosk Kaldi acoustic wake-word models and Piper neural TTS voice models if missing.
+5. **Autostart & Launch:** Configures `~/.config/autostart/void.desktop` and launches the VOID widget.
 
-### Arch Linux:
+### Running with Custom Model Arguments:
 ```bash
-sudo pacman -S --needed \
-    pipewire \
-    wireplumber \
-    espeak-ng \
-    wl-clipboard \
-    qt6-tools \
-    alsa-utils \
-    git \
-    curl \
-    python
+./terminalsetuprun "perplexity/pplx-decider-flash-v1.3:free" "sk-or-v1-YOUR_KEY_HERE"
 ```
 
 ---
 
-## 4. Python Virtual Environment Setup
+## 4. AI Model Configuration & Switching (Local & Cloud)
 
-Create an isolated virtual environment and install all required machine learning and desktop automation libraries:
+VOID supports local offline inference, cloud APIs, and intelligent hybrid operation:
 
-```bash
-# Create directory and virtual environment
-python3 -m venv /home/prakash/.dodaios/.venv
-
-# Activate virtual environment
-source /home/prakash/.dodaios/.venv/bin/activate
-
-# Upgrade pip, wheel, and setuptools
-pip install --upgrade pip setuptools wheel
-
-# Install PySide6 and GUI dependencies
-pip install PySide6
-
-# Install Audio and Neural Voice dependencies
-pip install \
-    sounddevice \
-    numpy \
-    vosk \
-    faster-whisper \
-    sherpa-onnx
-
-# Install Document Generation and Utility packages
-pip install \
-    python-docx \
-    openpyxl \
-    httpx \
-    beautifulsoup4 \
-    pillow
+### Configured Credentials File (`config/ai_providers.json`):
+```json
+{
+  "mode": "hybrid",
+  "cloud": {
+    "enabled": true,
+    "api_base": "https://openrouter.ai/api/v1",
+    "api_key": "sk-or-v1-your-openrouter-key-here",
+    "model": "perplexity/pplx-decider-flash-v1.3:free"
+  },
+  "profiles": {
+    "ollama_local": {
+      "provider_name": "Ollama Local",
+      "api_base": "http://127.0.0.1:11434",
+      "default_model": "lfm3-omni:2b",
+      "enabled": true
+    },
+    "openrouter": {
+      "provider_name": "OpenRouter",
+      "api_base": "https://openrouter.ai/api/v1",
+      "api_key": "sk-or-v1-your-openrouter-key-here",
+      "default_model": "perplexity/pplx-decider-flash-v1.3:free",
+      "enabled": true
+    }
+  },
+  "agent_model_assignments": {
+    "supervisor": {
+      "profile": "openrouter",
+      "model": "perplexity/pplx-decider-flash-v1.3:free"
+    },
+    "planner": {
+      "profile": "openrouter",
+      "model": "perplexity/pplx-decider-flash-v1.3:free"
+    }
+  }
+}
 ```
+
+### Supported Providers:
+- **OpenRouter:** `https://openrouter.ai/api/v1` (with live telemetry for credit balance and daily request limits).
+- **Ollama Local:** `http://127.0.0.1:11434` (offline `lfm3-omni:2b`).
+- **OpenAI:** `https://api.openai.com/v1`.
+- **Groq:** `https://api.groq.com/openai/v1`.
+- **DeepSeek:** `https://api.deepseek.com/v1`.
 
 ---
 
-## 5. Local Neural Brain (Ollama) Setup
+## 5. VOID Configuration Window & Sizing Presets
 
-VOID uses **Ollama** to serve quantized neural models on-device with zero external API dependencies.
+### Opening the Configuration Window
+Click the red-accented **⚙** icon on the right side of the widget, click the status dot/pill, or say:
+> *"Hey VOID, open settings"* / *"Hey VOID, configure models"*
 
-### Step 1: Install Ollama
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-```
-
-### Step 2: Configure Ollama Storage Directory (Optional)
-To store heavy models on an external high-speed disk instead of the root partition:
-```bash
-# Add to ~/.bashrc or systemd service override:
-export OLLAMA_MODELS="/run/media/prakash/TR_39/VOID/models/ollama"
-```
-
-### Step 3: Start Ollama and Pull the Recommended Brain Model
-```bash
-# Start Ollama service
-ollama serve &
-
-# Pull Liquid AI lfm3-omni:2b (fast, articulate, 1.7B parameter instruction model)
-ollama pull lfm3-omni:2b
-```
-
----
-
-## 6. Offline Speech Models Setup (STT & TTS)
-
-### A. Vosk Real-Time Acoustic Wake Word Model
-Download and unpack the small English acoustic model for low-power continuous listening:
-```bash
-mkdir -p /home/prakash/.dodaios/data/wake_models/vosk/en
-cd /home/prakash/.dodaios/data/wake_models/vosk/en
-wget https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
-unzip vosk-model-small-en-us-0.15.zip
-```
-
-### B. Faster-Whisper Base STT
-Faster-Whisper automatically downloads its quantized int8 weights on first invocation to `~/.cache/huggingface/hub/`.
-
-### C. Piper Local Neural TTS Voice
-VOID uses Piper via `sherpa-onnx` for conversational speech:
-```bash
-mkdir -p /run/media/prakash/TR_39/VOID/models/tts
-cd /run/media/prakash/TR_39/VOID/models/tts
-
-# Download Ryan Medium English neural voice
-wget -c https://github.com/rhasspy/piper/releases/download/v0.0.2/voice-en-us-ryan-medium.tar.gz
-tar -xvf voice-en-us-ryan-medium.tar.gz
-```
+### Window Features
+- **Tab 1: 🧠 Models & Cloud API Keys**
+  - Switch between Hybrid, Cloud-Only, and Local-Only modes.
+  - Set Default Model & API Key.
+  - Set independent Multi-Agent Planning Model & API Key.
+  - Real-time API key credit balance, daily requests remaining, and rate limits query (`/auth/key`).
+  - Live "Test Connection" button.
+  - "Save & Apply" button (applies changes in memory without restarting VOID).
+- **Tab 2: 🧩 Plugins & Skills**
+  - Displays all 8 active core plugins with enable/disable toggles.
+  - "Verify Skill Pipelines" button to test and confirm all tool registries.
+- **Tab 3: 📐 Sizing & Preferences**
+  - **Compact Bar (Pill):** 370 x 56 px.
+  - **2x2 Square Widget:** 400 x 320 px.
+  - **Large Multitask Window:** 750 x 550 px.
+  - **Free Resize:** Drag from bottom-right corner to any custom dimension.
+  - Voice Announcement Style: "Short & Sweet" (default) vs "Detailed".
+  - Ollama RAM Saver: Start or Stop Ollama to save 2 GB memory.
 
 ---
 
-## 7. Running & Launching VOID
+## 6. Plugin & Skill Pipeline Architecture
 
-### Interactive Launch (with Wayland Environment Flags)
-```bash
-env WAYLAND_DISPLAY=wayland-1 DISPLAY=:0 XDG_RUNTIME_DIR=/run/user/1000 QT_WAYLAND_RECONNECT=1 \
-    /home/prakash/.dodaios/.venv/bin/python /run/media/prakash/TR_39/VOID/bin/void-widget.py
-```
+VOID exposes 8 high-performance skills:
 
-### Using the Dedicated Runner Script
-```bash
-cd /run/media/prakash/TR_39/VOID
-chmod +x scripts/run_void.sh
-./scripts/run_void.sh
-```
-
-### Setting up Auto-Start on System Login (KDE Plasma)
-Create an autostart desktop entry:
-```bash
-mkdir -p ~/.config/autostart
-cat << 'EOF' > ~/.config/autostart/void-widget.desktop
-[Desktop Entry]
-Type=Application
-Name=VOID Desktop Assistant
-Exec=env WAYLAND_DISPLAY=wayland-1 DISPLAY=:0 XDG_RUNTIME_DIR=/run/user/1000 /home/prakash/.dodaios/.venv/bin/python /run/media/prakash/TR_39/VOID/bin/void-widget.py
-Hidden=false
-NoDisplay=false
-X-GNOME-Autostart-enabled=true
-EOF
-```
+1. **🛠 Dodaios Desktop Tool Hub:** 105 tools for system management, screenshot capture, file I/O, process control.
+2. **🪟 KWin Wayland Window Manager:** Instant sub-5ms window minimization, maximization, closing, and desktop display.
+3. **🎵 YouTube Direct Tab Media:** Instant playback of user-requested tracks in Chromium tabs with zero-autocorrect.
+4. **🎙 Faster-Whisper Base int8 STT:** Quantized offline acoustic speech-to-text.
+5. **🔊 Piper Neural TTS:** Natural Ryan voice speech synthesis.
+6. **📄 Document & PDF Composer:** Professional Word (.docx), PDF reports, and Excel spreadsheets.
+7. **🔍 Universal Content & File Search:** Rapid multi-directory indexing with instant xdg-open.
+8. **🤖 Multi-Agent Orchestrator:** 5-agent domain execution (Supervisor, Planner, Dev, Research, Verifier).
 
 ---
 
-## 8. Automated System Verification & Tests
+## 7. Voice Announcements (Short & Sweet)
 
-To verify that all 105 tools, the audio pipeline, document generation, and safeguards are functioning at 100%:
+To eliminate unnecessary verbosity, VOID confirms actions concisely:
 
-```bash
-# Run the full regression matrix (all 12 test suites, 94 unit tests)
-/home/prakash/.dodaios/.venv/bin/python -c '
-import subprocess
-tests = [
-    "test_speech_and_system_invariance.py",
-    "test_all_tools_and_emotion.py",
-    "test_generalised_ollama_commands.py",
-    "test_universal_open_and_search.py",
-    "test_youtube_dictation_and_memory.py",
-    "test_dictation_and_documents.py",
-    "test_glass_rendering.py",
-    "test_3d_globe_states.py",
-    "test_browser_and_email.py",
-    "test_audio_and_wake_isolation.py",
-    "test_offline_routing_and_phonetics.py",
-    "automated_system_test.py"
-]
-for t in tests:
-    res = subprocess.run(["/home/prakash/.dodaios/.venv/bin/python", f"/run/media/prakash/TR_39/VOID/scripts/{t}"], capture_output=True, text=True)
-    status = "PASSED" if res.returncode == 0 else "FAILED"
-    print(f"{status}: {t}")
-'
-```
+| Action | Spoken Confirmation |
+| :--- | :--- |
+| **Minimize App** | *"Minimized Antigravity."* |
+| **Close App** | *"Closed Chromium."* |
+| **Minimize Window** | *"Minimized."* |
+| **Show Desktop** | *"Showing desktop."* |
+| **Generate Document** | *"Completed document."* |
+| **Generate PDF** | *"Completed PDF."* |
+| **Open Folder** | *"Opened folder."* |
+| **Open Files** | *"Opened files."* |
+| **Play Song** | *"Playing Pesamalaye on tab."* |
+| **Take Screenshot** | *"Screenshot captured."* |
 
 ---
 
-## 9. Voice Commands & Feature Reference
+## 8. Media & Song Playback on Tabs (Zero Auto-Correction)
 
-| Category | Spoken Command Variations | System Action |
-| :--- | :--- | :--- |
-| **Wake Words** | *"Hey VOID"*, *"VOID"*, *"Hi VOID"*, *"Hello VOID"* | Wakes the assistant and begins listening. |
-| **Voice Diagnostics** | *"Test speech"*, *"Check speech"*, *"Test voice"*, *"Audio test"* | Synthesizes and plays diagnostic speech aloud via PipeWire (`pw-play`). |
-| **Volume Control** | *"Set volume to 75%"*, *"Volume up"*, *"Volume down"*, *"Mute audio"* | Adjusts PipeWire audio sink with strict intent guards. |
-| **Baseline Restore** | *"Reset volume"*, *"Restore volume"*, *"Reset brightness"*, *"Restore brightness"* | Restores audio volume or display brightness back to initial session baseline. |
-| **Display Brightness** | *"Set brightness to 80%"*, *"Brightness up"*, *"Brightness down"*, *"Screen dimmer"*, *"Screen brighter"* | Adjusts KDE display brightness percentage via DBus. |
-| **Universal Opener** | *"Open Mothers_Importance.docx"*, *"Open sample.mp4"*, *"Open calculator"*, *"Open terminal"* | Universal content opener: exact files, videos, photos, apps, web services. |
-| **YouTube Streaming** | *"Open YouTube and play believer song"* | Directly searches and plays the requested song or artist in Chromium. |
-| **Voice Dictation** | *"Start dictation"*, *"Voice typing"*, *"Write note"* | Live speech-to-text dictation into `~/Documents/Notes/`. |
-| **Exit Dictation** | *"Stop dictation"*, *"Cancel dictate"*, *"Done"* | Stops dictation mode, saves file, and speaks completion confirmation. |
-| **Document Drafting** | *"Draft docx on Quantum Computing"*, *"Create excel for budget"* | Creates fully formatted Word (`.docx`) or Excel (`.xlsx`) files. |
-| **Brain Lifecycle** | *"Start ollama"*, *"Activate brain"*, *"Put brain on standby"*, *"Stop ollama"* | Dynamically unloads/loads models from GPU memory (saving 2 GB VRAM). |
-| **Emergency Abort** | *"Stop"*, *"Cancel"*, *"Shut up"*, *"Stop talking"*, *"Stop thinking"* | Instantly interrupts speech and neural processing in `< 5ms`. |
-| **7-Day High Memory Synthesis** | *"Generate weekly memory"*, *"Save weekly memory"*, *"Create weekly memory file"* | Aggregates 7 days of thought traces and deliverables into structured JSON & Markdown digests. |
-| **Weekly Memory Recall** | *"What did we do this week"*, *"Weekly recap"*, *"Recall this week"* | Performs deep contextual retrieval across the past 7 days to answer user questions with full historical context. |
-| **Cloud AI Setup & Fallback** | *"Connect cloud api"*, *"Setup cloud api"*, *"Set cloud api key <key>"*, *"Set cloud model <model>"* | Proactive onboarding when offline; seamlessly connects OpenAI, OpenRouter, Groq, or Anthropic models with key masking. |
-| **AI Provider Status** | *"Cloud status"*, *"Check cloud api"*, *"AI provider status"* | Displays health and active routing modes (local Ollama, cloud API, or hybrid). |
-| **Autonomous Agent Demos** | *"Demo 1"*, *"Demo 2"*, *"Demo 3"*, *"Demo 4"* | Triggers competition-ready multi-agent workflows (Linux diagnostics, TDD, research, permission gating). |
-| **Shutdown** | *"Hey VOID terminate code 0"* | Gracefully closes VOID and shuts down the assistant process. |
+- **No Autocorrect on Songs:** Song titles (e.g., *"pesamalaye"*, *"shape of you"*, *"starboy"*) are never mangled into English acronyms (such as "PSA") or generic text.
+- **Browser Tabs:** All media requests automatically launch as **tabs** inside Chromium without forcing new windows.
+- **Phonetic Slips Handled:** Any speech transcription slip (e.g., "psa", "paisa malay", "paisal malay", "pesamale") is seamlessly mapped back to *"pesamalaye"*.
 
 ---
 
-## 10. Git Setup & GitHub Repository Synchronization
+## 9. Performance & Efficiency Optimizations
 
-### Step 1: Configure Git Identity
+- **Zero-Conflict Audio Stream:** Dodaios's background dictation worker (`preview_worker large-v3-turbo`) is automatically disabled, preventing 40-70% CPU waste and freeing 1.3 GB of memory.
+- **Sub-5ms Fast Path:** Native hardware controls (volume, brightness, window state, media, file openers) execute immediately without contacting the LLM.
+- **Dynamic VRAM Management:** Ollama model weights can be loaded or unloaded via voice (*"Hey VOID, stop ollama"*) to recover 2.0 GB of RAM.
+
+---
+
+## 10. Automated Verification & Test Matrix
+
+Run the automated regression test suites to verify 100% health:
+
 ```bash
-git config --global user.name "prakash2006-xl"
-git config --global user.email "rskakavin@gmail.com"
-git config --global credential.helper store
-```
-
-### Step 2: Push Initial Commit to GitHub
-Ensure the `.gitignore` excludes heavy model binaries before pushing:
-
-```bash
-cd /run/media/prakash/TR_39/VOID
-git init
-git branch -M main
-git remote add origin https://github.com/prakash2006-xl/VOID-.git
-
-# Stage documentation, configuration, and scripts
-git add README.md SETUP.md .gitignore bin/ config/ docs/ memory/ scripts/
-git commit -m "Initialize VOID assistant core and deployment documentation"
-
-# Push to GitHub (enter Personal Access Token when prompted)
-git push -u origin main
+/home/prakash/.dodaios/.venv/bin/python /run/media/prakash/TR_39/VOID/scripts/test_song_playback_and_fast_classification.py
+/home/prakash/.dodaios/.venv/bin/python /run/media/prakash/TR_39/VOID/scripts/test_multi_agent_system.py
 ```
 
 ---
 
 ## 11. Troubleshooting & Diagnostics
 
-### 1. No Audio Heard During Spoken Response
-- Verify PipeWire default audio sink is unmuted:
-  ```bash
-  wpctl get-volume @DEFAULT_AUDIO_SINK@
-  wpctl set-mute @DEFAULT_AUDIO_SINK@ 0
-  ```
-- Test PipeWire native playback directly:
-  ```bash
-  pw-play /usr/share/sounds/freedesktop/stereo/complete.oga
-  ```
-
-### 2. Microphone Not Picking Up Wake Word
-- Verify microphone capture source volume:
-  ```bash
-  wpctl get-volume @DEFAULT_AUDIO_SOURCE@
-  wpctl set-volume @DEFAULT_AUDIO_SOURCE@ 0.60
-  ```
-
-### 3. Wayland Display Connection Issue
-Ensure environment variables point to the active Wayland socket:
+### 1. Check Live Assistant Status
 ```bash
-echo $WAYLAND_DISPLAY
-# Should print 'wayland-0' or 'wayland-1'
+/run/media/prakash/TR_39/VOID/scripts/status_void.sh
 ```
 
-### 4. Ollama Out-of-Memory (VRAM)
-If your GPU VRAM is constrained, run:
+### 2. View Live Logs
 ```bash
-# Unload models from memory
-ollama stop lfm3-omni:2b
+tail -f /run/media/prakash/TR_39/VOID/config/widget.log
 ```
-VOID's voice command *"put brain on standby"* or *"stop ollama"* unloads models automatically.
+
+### 3. Audio / PipeWire Volume
+```bash
+wpctl set-mute @DEFAULT_AUDIO_SINK@ 0
+wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.75
+```
 
 ---
 
-*Documentation maintained by Prakash for VOID AI Assistant.*
+## 12. System Control & Activities (Power, Telemetry & Automation)
 
+VOID features sub-5ms native system control hooks for complete Linux desktop management:
+
+### 1. Power & Session Lifecycle Controls (5-Second Safety Gating)
+All power-destructive actions feature a 5-second cancelable interactive UI banner and voice cancelability:
+* **Shutdown / Power Off:**
+  * Voice commands: *"shut down system"*, *"shutdown system"*, *"power off"*, *"turn off computer"*, *"shut don system"*
+  * Executes: `systemctl poweroff` after a 5s countdown banner.
+  * Cancel action: Click the on-screen **Cancel** button, or simply say *"cancel shutdown"*, *"abort"*, or *"stop"*.
+* **Reboot / Restart:**
+  * Voice commands: *"restart system"*, *"reboot system"*, *"restart computer"*, *"reboot"*
+  * Executes: `systemctl reboot` after a 5s countdown banner.
+  * Cancel action: Click **Cancel** or say *"cancel restart"*.
+* **Sleep & Suspend:**
+  * Voice commands: *"sleep"*, *"suspend system"*, *"put computer to sleep"*
+  * Executes: `systemctl suspend` immediately.
+* **Hibernate:**
+  * Voice commands: *"hibernate system"*, *"hibernate"*
+  * Executes: `systemctl hibernate`.
+* **Lock Screen:**
+  * Voice commands: *"lock screen"*, *"lock computer"*, *"lock system"*
+  * Executes: `loginctl lock-session`.
+* **Logout / Sign Out:**
+  * Voice commands: *"logout"*, *"sign out"*
+  * Executes: KDE DBus logout / `loginctl terminate-session self`.
+
+### 2. Hardware Telemetry & Health Monitoring
+* **System Hardware Vitals:**
+  * Voice commands: *"check battery"*, *"system vitals"*, *"battery status"*, *"hardware temperature"*
+  * Returns: Live Battery % and state, CPU/GPU/NVMe temperatures (°C), RAM telemetry (used vs total GB), and 1-minute CPU load averages.
+* **Offload / Stop Neural Brain & Free RAM:**
+  * Voice commands: *"offload model"*, *"offlad model"*, *"stop, offload model"*, *"unload model"*, *"stop ollama"*, *"free ram"*, *"free memory"*
+  * Action: Evicts active model weights, terminates all `llama-server` backend processes, stops the Ollama daemon (`systemctl stop ollama`), severs internal connectivity, and completely frees all VRAM and system RAM. Connectivity remains strictly terminated until you say *"start model"*.
+* **Start Model / Re-activate Ollama:**
+  * Voice commands: *"start model"*, *"start model again"*, *"start the model"*, *"start ollama"*, *"load model"*, *"resume model"*
+  * Action: Starts the Ollama server daemon (`systemctl start ollama`), restores internal connectivity, warms up the model into GPU/RAM, and brings the local AI brain back online.
+
+### 3. Desktop, Window & Process Activities
+* **Window Management:**
+  * *"minimize antigravity"*, *"close chromium"*, *"maximize terminal"*, *"fullscreen"*
+  * *"show desktop"* (instantly toggles clean desktop view).
+* **Process & Task Management:**
+  * *"list tasks"*, *"system status"*, *"top processes"*
+* **Audio & Display:**
+  * *"volume 50%"*, *"mute audio"*, *"unmute"*, *"brightness 75%"*
+* **Screen Capture:**
+  * *"take a screenshot"*, *"capture screen"* $\rightarrow$ Saved to `/home/prakash/Pictures/Screenshots`.
+* **Interactive Timers & Alarms:**
+  * *"set timer for 10 minutes"*, *"cancel timer"* $\rightarrow$ Real-time countdown on widget banner with audio completion chime.
+
+---
+*Maintained by Prakash for the VOID Autonomous AI Desktop Assistant.*

@@ -118,6 +118,9 @@ class SupervisorAgent(BaseAgent):
         if any(kw in clean for kw in self.AGENTIC_KEYWORDS):
             return {"mode": "AGENTIC_WORKFLOW", "reason": "Complex multi-agent workflow detected"}
 
+        if "research" in clean and any(w in clean for w in ("write", "docx", "report", "paper", "summary", "analyze")):
+            return {"mode": "AGENTIC_WORKFLOW", "reason": "Research and report authoring task"}
+
         # 6. Difficult multi-step project scaffolding / dataset analysis heuristic
         if any(k in clean for k in ("create project", "scaffold", "generate dataset", "run test suite", "performance audit")):
             return {"mode": "AGENTIC_WORKFLOW", "reason": "Complex development/investigation task"}

@@ -56,8 +56,11 @@ class LocalOllamaProvider(BaseAIProvider):
     def __init__(self, base_url: str = DEFAULT_OLLAMA_URL, model: str = DEFAULT_LOCAL_MODEL) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
+        self.offloaded: bool = False
 
     def generate(self, prompt: str, system: str = "", temperature: float = 0.3, max_tokens: int = 1024) -> str:
+        if self.offloaded:
+            raise RuntimeError("Local model is offloaded and Ollama server is stopped. Say 'start model' to re-activate.")
         url = f"{self.base_url}/api/generate"
         payload = {
             "model": self.model,
@@ -79,6 +82,8 @@ class LocalOllamaProvider(BaseAIProvider):
             raise RuntimeError(f"Local Ollama generation error: {e}") from e
 
     def test_connection(self) -> dict[str, Any]:
+        if self.offloaded:
+            return {"online": False, "offloaded": True, "error": "Model offloaded by user request.", "latency_ms": 0}
         t0 = time.time()
         try:
             r = httpx.get(f"{self.base_url}/api/tags", timeout=3.0)
@@ -123,6 +128,67 @@ class CloudOpenAICompatibleProvider(BaseAIProvider):
             return "****"
         return f"{self.api_key[:4]}...{self.api_key[-4:]}"
 
+    @staticmethod
+    def _extract_choice_text(choice: dict[str, Any]) -> str:
+        import re
+        msg = choice.get("message", {})
+        text = msg.get("content") or ""
+        if not text and msg.get("reasoning"):
+            text = msg.get("reasoning")
+        if not text and choice.get("text"):
+            text = choice.get("text")
+        if not text:
+            return ""
+        cleaned = re.sub(r"<think>[\s\S]*?</think>", "", str(text), flags=re.DOTALL).strip()
+        cleaned = re.sub(r"<thought>[\s\S]*?</thought>", "", cleaned, flags=re.DOTALL).strip()
+        cleaned = re.sub(r"^(?:Thought|Thinking):\s*[\s\S]*?\n\n", "", cleaned, flags=re.I).strip()
+        return cleaned or str(text).strip()
+
+    def fetch_key_info(self) -> dict[str, Any]:
+        """Queries OpenRouter or cloud provider key details: credits remaining, usage, rate limits."""
+        if not self.api_key:
+            return {"valid": False, "error": "No API key configured."}
+        if "openrouter.ai" in self.api_base:
+            try:
+                headers = {"Authorization": f"Bearer {self.api_key}"}
+                r = httpx.get("https://openrouter.ai/api/v1/auth/key", headers=headers, timeout=5.0)
+                if r.status_code == 200:
+                    d = r.json().get("data", {})
+                    f_req = d.get("free_model_daily_requests", {})
+                    limit_rem = d.get("limit_remaining")
+                    rate_lim = d.get("rate_limit", {})
+                    remaining_req = f_req.get("remaining", "Unlimited") if f_req else "Unlimited"
+                    limit_req = f_req.get("limit", 50) if f_req else 50
+                    return {
+                        "valid": True,
+                        "label": d.get("label", self.masked_key),
+                        "is_free_tier": d.get("is_free_tier", True),
+                        "usage": d.get("usage", 0),
+                        "limit_remaining": limit_rem if limit_rem is not None else "Unlimited",
+                        "free_requests_limit": limit_req,
+                        "free_requests_remaining": remaining_req,
+                        "rate_limit_interval": rate_lim.get("interval", "10s") if rate_lim else "Standard (10s)",
+                        "rate_limit_requests": rate_lim.get("requests", -1) if rate_lim else -1,
+                    }
+                return {"valid": False, "error": f"HTTP {r.status_code}: {r.text[:100]}"}
+            except Exception as e:
+                return {"valid": False, "error": str(e)}
+        else:
+            try:
+                headers = {"Authorization": f"Bearer {self.api_key}"}
+                r = httpx.get(f"{self.api_base}/models", headers=headers, timeout=5.0)
+                if r.status_code == 200:
+                    return {
+                        "valid": True,
+                        "label": self.masked_key,
+                        "is_free_tier": False,
+                        "limit_remaining": "Standard",
+                        "rate_limit_interval": "Standard",
+                    }
+                return {"valid": False, "error": f"HTTP {r.status_code}"}
+            except Exception as e:
+                return {"valid": False, "error": str(e)}
+
     def generate(self, prompt: str, system: str = "", temperature: float = 0.3, max_tokens: int = 1024) -> str:
         if not is_valid_api_key(self.api_key):
             raise ValueError("Cloud provider selected but no valid API key is configured.")
@@ -148,8 +214,21 @@ class CloudOpenAICompatibleProvider(BaseAIProvider):
                 data = r.json()
                 choices = data.get("choices", [])
                 if choices:
-                    return choices[0].get("message", {}).get("content", "").strip()
+                    return self._extract_choice_text(choices[0])
                 return ""
+            # Graceful decision-model & rate-limit handling on OpenRouter
+            if r.status_code != 200:
+                for candidate in ["liquid/lfm-3-1.7b:free", "openrouter/auto"]:
+                    fallback_payload = dict(payload, model=candidate, max_tokens=max(max_tokens, 128))
+                    try:
+                        r2 = httpx.post(url, json=fallback_payload, headers=headers, timeout=self.timeout)
+                        if r2.status_code == 200:
+                            data = r2.json()
+                            choices = data.get("choices", [])
+                            if choices:
+                                return self._extract_choice_text(choices[0])
+                    except Exception:
+                        continue
             raise RuntimeError(f"Cloud provider returned HTTP {r.status_code}: {r.text[:200]}")
         except Exception as e:
             raise RuntimeError(f"Cloud generation error: {e}") from e
@@ -158,6 +237,18 @@ class CloudOpenAICompatibleProvider(BaseAIProvider):
         if not self.api_key:
             return {"online": False, "error": "No API key configured.", "latency_ms": 0}
         t0 = time.time()
+        key_info = self.fetch_key_info()
+        lat = round((time.time() - t0) * 1000, 1)
+        if key_info.get("valid", False):
+            return {
+                "online": True,
+                "latency_ms": lat,
+                "provider": self.name,
+                "model": self.model,
+                "masked_key": self.masked_key,
+                "key_info": key_info
+            }
+        # Fallback to direct /models check
         try:
             url = f"{self.api_base}/models"
             headers = {"Authorization": f"Bearer {self.api_key}"}
@@ -169,11 +260,12 @@ class CloudOpenAICompatibleProvider(BaseAIProvider):
                     "latency_ms": lat,
                     "provider": self.name,
                     "model": self.model,
-                    "masked_key": self.masked_key
+                    "masked_key": self.masked_key,
+                    "key_info": key_info
                 }
-            return {"online": False, "error": f"HTTP {r.status_code}", "latency_ms": lat}
+            return {"online": False, "error": f"HTTP {r.status_code}", "latency_ms": lat, "key_info": key_info}
         except Exception as e:
-            return {"online": False, "error": str(e), "latency_ms": round((time.time() - t0) * 1000, 1)}
+            return {"online": False, "error": str(e), "latency_ms": round((time.time() - t0) * 1000, 1), "key_info": key_info}
 
 class DefaultSystemProvider(BaseAIProvider):
     """
@@ -351,7 +443,7 @@ class AIProviderManager:
                 data = json.loads(cfg_path.read_text(encoding="utf-8"))
                 self.mode = data.get("mode", "local")
                 cloud_cfg = data.get("cloud", {})
-                if cloud_cfg.get("enabled", False) and cloud_cfg.get("api_key"):
+                if cloud_cfg.get("enabled", False) and is_valid_api_key(cloud_cfg.get("api_key")):
                     self.cloud_provider = CloudOpenAICompatibleProvider(
                         api_base=cloud_cfg.get("api_base", "https://api.openai.com/v1"),
                         api_key=cloud_cfg.get("api_key", ""),
@@ -362,6 +454,17 @@ class AIProviderManager:
                 self.agent_model_assignments = data.get("agent_model_assignments", {})
             except Exception:
                 pass
+
+        # If user has not added valid cloud models or API keys, default mode MUST be local!
+        has_any_cloud = (
+            (self.cloud_provider is not None and is_valid_api_key(self.cloud_provider.api_key)) or
+            any(
+                p_name != "ollama_local" and p_data.get("enabled", True) and is_valid_api_key(p_data.get("api_key"))
+                for p_name, p_data in self.profiles.items()
+            )
+        )
+        if not has_any_cloud:
+            self.mode = "local"
 
     def get_provider_for_agent(self, agent_role: Any) -> BaseAIProvider:
         """Resolves the designated provider and model for a specific agent role."""
@@ -459,10 +562,138 @@ class AIProviderManager:
             self.cloud_provider = None
         self._save_full_config()
 
+    def update_model_and_keys(
+        self,
+        default_provider: str = "openrouter",
+        default_model: str = "perplexity/pplx-decider-flash-v1.3:free",
+        default_key: str = "",
+        planner_provider: str = "openrouter",
+        planner_model: str = "perplexity/pplx-decider-flash-v1.3:free",
+        planner_key: str = "",
+        mode: str = "hybrid"
+    ) -> dict[str, Any]:
+        """
+        Updates default and multi-agent planning models & keys, persists to disk,
+        and clears in-memory caches for live hot-reloading.
+        """
+        self.mode = mode
+        provider_base = "https://openrouter.ai/api/v1" if "openrouter" in default_provider.lower() else (
+            "https://api.openai.com/v1" if "openai" in default_provider.lower() else "http://127.0.0.1:11434"
+        )
+        
+        # Configure active cloud provider
+        if default_key:
+            self.cloud_provider = CloudOpenAICompatibleProvider(
+                api_base=provider_base,
+                api_key=default_key,
+                model=default_model
+            )
+            self.profiles["openrouter"] = {
+                "provider_name": "OpenRouter",
+                "api_base": "https://openrouter.ai/api/v1",
+                "api_key": default_key,
+                "default_model": default_model,
+                "enabled": True
+            }
+
+        effective_planner_key = planner_key or default_key
+        if effective_planner_key and "openrouter" in planner_provider.lower():
+            if "openrouter" not in self.profiles:
+                self.profiles["openrouter"] = {
+                    "provider_name": "OpenRouter",
+                    "api_base": "https://openrouter.ai/api/v1",
+                    "api_key": effective_planner_key,
+                    "default_model": planner_model,
+                    "enabled": True
+                }
+
+        # Update agent assignments
+        self.agent_model_assignments["supervisor"] = {
+            "profile": "openrouter" if default_key else "ollama_local",
+            "model": default_model if default_key else "lfm3-omni:2b"
+        }
+        self.agent_model_assignments["planner"] = {
+            "profile": "openrouter" if effective_planner_key else "ollama_local",
+            "model": planner_model if effective_planner_key else "lfm3-omni:2b"
+        }
+
+        self._provider_cache.clear()
+        self._save_full_config()
+        return {
+            "mode": self.mode,
+            "default_model": default_model,
+            "planner_model": planner_model,
+            "masked_key": f"{default_key[:4]}...{default_key[-4:]}" if len(default_key) > 8 else "None"
+        }
+
+    def update_multi_model_pipeline(
+        self,
+        mode: str = "hybrid",
+        profiles_config: Optional[dict[str, Any]] = None,
+        agent_assignments: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        """
+        Comprehensive multi-model planning and execution updater:
+        Configures multiple cloud & local providers with distinct API keys,
+        binds specialized models to each agent role, persists to disk,
+        and invalidates runtime caches for instant hot-reload.
+        """
+        self.mode = mode
+        if profiles_config:
+            for prof_id, prof_data in profiles_config.items():
+                if prof_id not in self.profiles:
+                    self.profiles[prof_id] = {}
+                self.profiles[prof_id].update(prof_data)
+
+                # If this profile is openrouter or primary cloud, update self.cloud_provider
+                if prof_id in ("openrouter", "active_cloud", "openai") and prof_data.get("enabled"):
+                    if prof_data.get("api_key") and is_valid_api_key(prof_data.get("api_key")):
+                        self.cloud_provider = CloudOpenAICompatibleProvider(
+                            api_base=prof_data.get("api_base", "https://openrouter.ai/api/v1"),
+                            api_key=prof_data.get("api_key", ""),
+                            model=prof_data.get("default_model", "perplexity/pplx-decider-flash-v1.3:free")
+                        )
+
+        # Ensure default model is set to local if user does not add cloud models/keys
+        has_any_cloud = (
+            (self.cloud_provider is not None and is_valid_api_key(self.cloud_provider.api_key)) or
+            any(
+                p_name != "ollama_local" and p_data.get("enabled", True) and is_valid_api_key(p_data.get("api_key"))
+                for p_name, p_data in self.profiles.items()
+            )
+        )
+        if not has_any_cloud:
+            self.mode = "local"
+
+        if agent_assignments:
+            for role_name, assign in agent_assignments.items():
+                r_key = role_name.lower().strip()
+                self.agent_model_assignments[r_key] = {
+                    "profile": assign.get("profile", "openrouter"),
+                    "model": assign.get("model", "perplexity/pplx-decider-flash-v1.3:free")
+                }
+
+        self._provider_cache.clear()
+        self._save_full_config()
+        return {
+            "mode": self.mode,
+            "profiles_count": len(self.profiles),
+            "assignments_count": len(self.agent_model_assignments),
+            "status": "applied"
+        }
+
     def is_local_online(self) -> bool:
         """Checks if local Ollama daemon is currently responsive."""
+        if getattr(self, "_local_offloaded", False) or getattr(self.local_provider, "offloaded", False):
+            return False
         status = self.local_provider.test_connection()
         return bool(status.get("online", False))
+
+    def set_local_offloaded(self, offloaded: bool) -> None:
+        """Explicitly sets whether the local Ollama brain is offloaded and terminated."""
+        self._local_offloaded = offloaded
+        if hasattr(self, "local_provider"):
+            self.local_provider.offloaded = offloaded
 
     def is_cloud_configured(self) -> bool:
         """Checks if a valid cloud provider with functional API key is loaded."""

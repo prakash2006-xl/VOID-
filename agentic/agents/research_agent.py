@@ -58,10 +58,12 @@ class ResearchProductivityAgent(BaseAgent):
             topic = task.tool_args.get("topic", "Autonomous Systems")
             file_type = task.tool_args.get("file_type", "pdf")
             custom_title = task.tool_args.get("custom_title", "")
+            target_pages = task.tool_args.get("target_pages")
             return self.tools.execute("compose_comprehensive_document", {
                 "topic": topic,
                 "file_type": file_type,
                 "custom_title": custom_title,
+                "target_pages": target_pages,
             })
 
         elif action == "rewrite_document":
