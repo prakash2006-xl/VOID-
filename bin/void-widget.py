@@ -116,6 +116,20 @@ def get_last_created_file_metadata() -> str | None:
 OLLAMA_URL = "http://127.0.0.1:11434"
 DODAIOS_URL = "http://127.0.0.1:47821"
 
+def get_default_local_model() -> str:
+    try:
+        cfg = CONFIG_DIR / "ai_providers.json"
+        if not cfg.exists():
+            cfg = SSD_VOID_DIR / "config" / "ai_providers.json"
+        if cfg.exists():
+            data = json.loads(cfg.read_text(encoding="utf-8"))
+            m = data.get("profiles", {}).get("ollama_local", {}).get("default_model")
+            if m:
+                return m
+    except Exception:
+        pass
+    return "nano-brain"
+
 VOSK_MODEL_PATH = str(Path.home() / ".dodaios/data/wake_models/vosk/en/vosk-model-small-en-us-0.15")
 WHISPER_MODEL_NAME = "base"
 PIPER_MODEL_PATH = str(Path.home() / ".dodaios/data/models/vits-piper-en_US-ryan-medium/en_US-ryan-medium.onnx")
@@ -888,6 +902,9 @@ def play_chime(kind: str = "wake") -> None:
                 tone1 = np.sin(2 * np.pi * 587.33 * t1) * 0.25 * np.linspace(1, 0.4, len(t1))
                 tone2 = np.sin(2 * np.pi * 880.00 * t2) * 0.30 * np.linspace(1, 0, len(t2))
                 audio = np.concatenate([tone1, tone2])
+            elif kind in ["tick", "thinking"]:
+                t = np.linspace(0, 0.04, int(sr * 0.04), False)
+                audio = np.sin(2 * np.pi * 880.0 * t) * 0.15 * np.linspace(1, 0, len(t))
             else:  # alarm chime
                 tones = []
                 for freq in [659.25, 880.00, 1046.50, 1318.51]:
@@ -1142,7 +1159,7 @@ def get_system_health() -> dict[str, Any]:
             names = [m.get("name", "") for m in running]
             health["ollama_running"] = True
             health["loaded_models"] = names
-            health["brain_active"] = any("lfm3" in n for n in names)
+            health["brain_active"] = any(("nano-brain" in n or "lfm3" in n) for n in names)
         else:
             health["ollama_running"] = False
             health["loaded_models"] = []
@@ -4622,7 +4639,7 @@ class OrbWidget(QWidget):
 def start_ollama_service(model_name: str = "") -> tuple[bool, str]:
     """Starts Ollama daemon if needed and loads the requested brain model into VRAM."""
     import httpx
-    target_model = model_name or "lfm3-omni:2b"
+    target_model = model_name or get_default_local_model()
     started = False
     try:
         r = httpx.get(f"{OLLAMA_URL}/api/tags", timeout=0.8)
@@ -4690,7 +4707,7 @@ def stop_all_ollama_models(kill_server: bool = False, specific_model: str = "") 
     except Exception:
         pass
 
-    for fallback in ["lfm3-omni:2b", "lfm3-omni-2b-jarvis-f0966e86:latest"]:
+    for fallback in [get_default_local_model(), "nano-brain", "lfm3-omni:2b", "lfm3-omni-2b-jarvis-f0966e86:latest"]:
         if fallback not in stopped:
             subprocess.run(["ollama", "stop", fallback], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             stopped.append(fallback)
@@ -4841,7 +4858,7 @@ class AudioVoiceEngine(QObject):
                         time.sleep(0.4)
                 if started:
                     try:
-                        httpx.post(f"{OLLAMA_URL}/api/generate", json={"model": "lfm3-omni:2b", "prompt": "ready", "stream": False}, timeout=10.0)
+                        httpx.post(f"{OLLAMA_URL}/api/generate", json={"model": get_default_local_model(), "prompt": "ready", "stream": False}, timeout=10.0)
                     except Exception:
                         pass
             except Exception as e:
@@ -4879,15 +4896,15 @@ class AudioVoiceEngine(QObject):
                 print(f"[VOID Audio Warning] Vosk load: {e}")
 
             try:
-                self._whisper = WhisperModel(WHISPER_MODEL_NAME, device="cpu", compute_type="int8")
-                print("[VOID Audio] Faster-Whisper base STT ready.")
+                self._whisper = WhisperModel(WHISPER_MODEL_NAME, device="cpu", compute_type="int8", cpu_threads=4, num_workers=1)
+                print("[VOID Audio] Faster-Whisper base STT ready (AVX2 4-thread).")
             except Exception as e:
                 print(f"[VOID Audio Warning] Whisper load: {e}")
 
             try:
                 from dodaios.plugins.tts.piper_local import PiperLocalTTS
-                self._tts = PiperLocalTTS(voice="vits-piper-en_US-ryan-medium", speed=1.0)
-                print("[VOID Audio] Piper neural TTS ready.")
+                self._tts = PiperLocalTTS(voice="vits-piper-en_US-ryan-medium", speed=1.06)
+                print("[VOID Audio] Piper neural TTS ready (speed=1.06).")
             except Exception as e:
                 print(f"[VOID Audio Warning] Piper load: {e}")
 
@@ -4982,9 +4999,9 @@ class AudioVoiceEngine(QObject):
                                 silence_duration = now - self._last_speech_time
                                 total_duration = now - self._command_start_time
 
-                                # Requirement: If the user stays silent for 3 seconds, automatically stop listening and start execution
-                                if self._has_spoken and (self._silence_chunks >= 30 or silence_duration >= 3.0):
-                                    print(f"[VOID Audio] 3s silence detected after speech (chunks={self._silence_chunks}, dur={silence_duration:.2f}s). Starting execution.", flush=True)
+                                # Dynamic silence detection: 0.95s after speaking ends, or 3.0s if user never speaks
+                                if self._has_spoken and (self._silence_chunks >= 10 or silence_duration >= 0.95):
+                                    print(f"[VOID Audio] End of utterance detected (silence={silence_duration:.2f}s, chunks={self._silence_chunks}). Executing immediately.", flush=True)
                                     self._finish_utterance_and_process()
                                 elif not self._has_spoken and total_duration >= 3.0:
                                     print(f"[VOID Audio] 3s initial silence (no speech detected). Ending listening.", flush=True)
@@ -5039,11 +5056,15 @@ class AudioVoiceEngine(QObject):
     def _finish_utterance_and_process(self) -> None:
         self._mode = "processing"
         self.state_changed.emit("thinking")
+        play_chime("tick")
         if not self._audio_buffer:
             self._return_to_wake()
             return
 
-        all_samples = np.concatenate(self._audio_buffer).astype(np.float32) / 32768.0
+        # Strip trailing silence chunks so Faster-Whisper doesn't waste time transcribing dead silence
+        trailing = min(self._silence_chunks, max(0, len(self._audio_buffer) - 3))
+        chunks_to_use = self._audio_buffer[:-trailing] if trailing > 0 else self._audio_buffer
+        all_samples = np.concatenate(chunks_to_use).astype(np.float32) / 32768.0 if chunks_to_use else np.array([], dtype=np.float32)
         self._audio_buffer.clear()
 
         peak_rms = float(np.max(np.abs(all_samples))) if len(all_samples) > 0 else 0.0
@@ -5059,7 +5080,13 @@ class AudioVoiceEngine(QObject):
             try:
                 if self._whisper is not None:
                     print(f"[VOID Audio] Transcribing with Faster-Whisper (dur={duration_sec:.2f}s, peak={peak_rms:.4f})...", flush=True)
-                    segments, _ = self._whisper.transcribe(all_samples, beam_size=1, language="en")
+                    segments, _ = self._whisper.transcribe(
+                        all_samples,
+                        beam_size=1,
+                        language="en",
+                        vad_filter=True,
+                        vad_parameters=dict(min_silence_duration_ms=250)
+                    )
                     text = " ".join(s.text for s in segments).strip()
                     print(f"[VOID Audio] Transcribed: '{text}'", flush=True)
 
@@ -5108,7 +5135,7 @@ class AudioVoiceEngine(QObject):
         by killing llama-server runners and stopping Ollama daemon, then severs
         local connectivity while preserving full Cloud AI operations.
         """
-        unloaded = ["lfm3-omni:2b"]
+        unloaded = [get_default_local_model(), "nano-brain", "lfm3-omni:2b"]
 
         # 1. Immediate SIGKILL to llama-server runners - instantly frees all GPU & system RAM in <5ms
         try:
@@ -5134,11 +5161,12 @@ class AudioVoiceEngine(QObject):
     def _offload_all_models(self) -> list[str]:
         return self._offload_and_stop_ollama()
 
-    def _start_and_load_ollama(self, model_name: str = "lfm3-omni:2b") -> tuple[bool, str]:
+    def _start_and_load_ollama(self, model_name: str = "") -> tuple[bool, str]:
         """
         Restores connectivity and starts the Ollama server, then warms up the specified model.
         """
         import httpx
+        target_model = model_name or get_default_local_model()
         self._model_offloaded = False
         self._ollama_stopped = False
         if hasattr(self, "_agent_providers") and self._agent_providers:
@@ -5177,10 +5205,10 @@ class AudioVoiceEngine(QObject):
 
         if started:
             try:
-                httpx.post(f"{OLLAMA_URL}/api/generate", json={"model": model_name, "prompt": "ready", "stream": False}, timeout=10.0)
+                httpx.post(f"{OLLAMA_URL}/api/generate", json={"model": target_model, "prompt": "ready", "stream": False}, timeout=10.0)
             except Exception:
                 pass
-            return True, f"Ollama server started and {model_name} is online."
+            return True, f"Ollama server started and {target_model} is online."
         else:
             return False, "Could not start Ollama server."
 
@@ -5780,7 +5808,7 @@ class AudioVoiceEngine(QObject):
             self.cancel_active_task()
             self._pending_action = None
             m_req = re.search(r"(?:with\s+(?:model\s+)?|model\s+)([a-zA-Z0-9_\-.:]+)", q_clean, re.I)
-            target_m = m_req.group(1).strip() if m_req else "lfm3-omni:2b"
+            target_m = m_req.group(1).strip() if m_req else get_default_local_model()
             ok, msg = self._start_and_load_ollama(target_m)
             if ok:
                 return ("Ollama server started and model is online.", "Model: Online", "")
@@ -6005,7 +6033,7 @@ class AudioVoiceEngine(QObject):
 
         # 0d1. Generalized Model Name Extraction (e.g. "start ollama with llama3")
         m_req = re.search(r"(?:with\s+(?:model\s+)?|model\s+)([a-zA-Z0-9_\-.:]+)", q_clean, re.I)
-        target_model = m_req.group(1).strip() if m_req else "lfm3-omni:2b"
+        target_model = m_req.group(1).strip() if m_req else get_default_local_model()
 
         # 0d2. Generalized Restart Ollama
         is_restart_ollama = bool(
@@ -7086,10 +7114,11 @@ if __name__ == "__main__":
             "is ollama running", "system health", "machine health"
         ]):
             h = get_system_health()
+            def_m = get_default_local_model()
             if h.get("brain_active"):
-                brain_str = "My AI brain (lfm3-omni:2b) is online and resident in memory."
+                brain_str = f"My AI brain ({def_m}) is online and resident in memory."
             elif h.get("ollama_running"):
-                brain_str = "Ollama server is active, but lfm3-omni:2b is on standby."
+                brain_str = f"Ollama server is active, but {def_m} is on standby."
             else:
                 brain_str = "My AI brain is currently sleeping on standby to preserve power."
             reply = (
@@ -7514,97 +7543,144 @@ if __name__ == "__main__":
         if any(p in q_lower for p in ["what time is it", "current time", "what is the date", "what's the date"]):
             return (f"It is {time.strftime('%A, %B %d, %I:%M %p')}.", "Time & Date", "")
 
-        # 12. Conversational AI Brain (Ollama lfm3-omni:2b + Tool Calling + Planning Engine)
+        # 12. Conversational AI Brain (Ultra-fast nano-brain / Selective Tool Execution Engine)
         import httpx
         ollama_online = False
+        installed_names = []
         if not getattr(self, "_model_offloaded", False):
             try:
                 r = httpx.get(f"{OLLAMA_URL}/api/tags", timeout=0.8)
-                ollama_online = (r.status_code == 200)
+                if r.status_code == 200:
+                    ollama_online = True
+                    installed_names = [m.get("name", "") for m in r.json().get("models", [])]
             except Exception:
                 ollama_online = False
 
         if ollama_online:
             try:
-                system_msg = {
-                    "role": "system",
-                    "content": (
-                        "You are VOID, the personal autonomous AI desktop assistant on Fedora Linux KDE Plasma. "
-                        "You have direct tool execution capabilities and access to 1.5GB persistent SSD memory.\n"
-                        f"Context & Preferences: {self.memory.get_context_summary()}\n"
-                        "STRICT BEHAVIOR RULES:\n0. CRITICAL: EXECUTE ONLY THE USER'S CURRENT REQUEST. DO NOT re-execute, repeat, or resurrect tasks, tool calls, or actions from previous turns. Treat each user message as a distinct goal.\n"
-                        "1. NEVER introduce yourself unless the user explicitly asks 'who are you'. NEVER begin responses with 'I am VOID' or 'As an AI assistant'.\n"
-                        "2. AUTONOMOUS TASK PLANNING & EXECUTION: You possess full capability to plan and execute multi-step complex tasks. When the user gives a complex goal, formulate a clear sequential plan, decompose it into sub-goals, and invoke necessary tools (e.g. web search, file management, email drafting, safe commands, task reminders) step by step until the goal is fully achieved.\n"
-                        "3. BROWSER & TAB EXECUTION: NEVER automatically open Chromium tabs or windows for general questions, summaries, or web research. Only call 'browser_open' when the user explicitly requests to open a website on screen, open a new tab, or open a browser window. To close an active tab, invoke 'browser_close_tab'. For general web knowledge, use 'search_web' (headless) and answer in text/voice without launching the browser GUI.\n"
-                        "4. TRUTHFUL BOUNDARIES: If a user asks for something outside system boundaries or impossible with available tools (e.g. modifying root system files, accessing unauthorized remote accounts), state clearly: 'I am unable to complete this task because [exact reason]'. NEVER claim an action was done if no tool was executed.\n"
-                        "5. APP OPENING & CLOSING: Always launch desktop applications natively using system desktop entries (e.g. Antigravity IDE, Konsole, Dolphin, Kate, KCalc). If the user asks to open an application (such as 'open antigravity' or 'open anti-gravty'), NEVER fall back to Chrome web search! Antigravity IDE is installed as a system snap application. When asked to close an application, call close_application with the target process name.\n"
-                        "6. DOCUMENT GENERATION & MULTI-PAGE ADHERENCE: When asked to compose documents, extract the actual title (from 'titled ...' or 'called ...') and requested page count (e.g. '5 page', '3 pages'). Format both Word (.docx) and PDF documents with rich structured comparison tables, executive callout shapes, and metric cards. For multi-page requests, generate deep sections scaled to the requested length.\n"
-                        "7. FILE SEARCH & NUMBERED SELECTION: When searching files, return all matching results across Documents, Downloads, Desktop, and project directories with numbered clickable links. When the user says 'open 1' or 'open file 1', open that exact file immediately.\n"
-                        "8. FILE DELETION SAFETY: When asked to delete or remove a file, call 'delete_file' with the exact-case filename. File deletion is strictly case-sensitive and automatically triggers interactive user confirmation. The user holds the final deletion decision.\n"
-                        "9. Provide a direct, concise final response (1-2 sentences maximum) summarizing the completed plan and actions."
-                    ),
-                }
-                messages = [system_msg, *self._chat_history[-8:], {"role": "user", "content": query}]
-                max_agent_steps = 8
-                current_step = 0
-                all_executed_names = []
+                def_model = get_default_local_model()
+                # Find best matching model
+                if any(def_model in m for m in installed_names):
+                    chosen_model = def_model
+                elif any("nano-brain" in m for m in installed_names):
+                    chosen_model = "nano-brain"
+                elif any("lfm3-omni" in m for m in installed_names):
+                    chosen_model = "lfm3-omni:2b"
+                else:
+                    chosen_model = installed_names[0] if installed_names else "nano-brain"
 
-                while current_step < max_agent_steps:
-                    if self._abort_requested.is_set():
-                        return ("Thinking process stopped by user.", "Cancelled", "")
-                    current_step += 1
-                    payload = {
-                        "model": "lfm3-omni:2b",
-                        "messages": messages,
-                        "tools": TOOLS_SCHEMA,
-                        "stream": False,
+                # Check if this query genuinely requires external tool invocation
+                tool_triggers = [
+                    "search web", "google", "find file", "look up", "note", "reminder", "remind me",
+                    "email", "send mail", "take screenshot", "capture screen", "create document",
+                    "make pdf", "generate pdf", "save file", "open tab", "close tab"
+                ]
+                needs_tools = any(t in query.lower() for t in tool_triggers)
+
+                # If query is conversational / informative / coding / chat, answer directly with sub-350ms latency
+                if not needs_tools or "nano-brain" in chosen_model:
+                    chat_system_msg = {
+                        "role": "system",
+                        "content": (
+                            "You are VOID, the ultra-fast personal AI assistant on Fedora Linux. "
+                            f"Context: {self.memory.get_context_summary()}\n"
+                            "Answer user queries clearly, concisely, and helpfully in 1-2 direct sentences."
+                        )
                     }
-                    try:
-                        res = httpx.post(f"{OLLAMA_URL}/api/chat", json=payload, timeout=30.0)
-                    except Exception as e:
-                        print(f"[VOID Brain HTTP Error] {e}", flush=True)
-                        break
+                    payload = {
+                        "model": chosen_model,
+                        "messages": [chat_system_msg, *self._chat_history[-4:], {"role": "user", "content": query}],
+                        "options": {"num_predict": 100, "num_thread": 4, "temperature": 0.6},
+                        "keep_alive": "10m",
+                        "stream": False
+                    }
+                    res = httpx.post(f"{OLLAMA_URL}/api/chat", json=payload, timeout=12.0)
+                    if res.status_code == 200:
+                        reply_text = res.json().get("message", {}).get("content", "").strip()
+                        badge_label = chosen_model.split(":")[0]
+                        action_badge = f"Brain: {badge_label}"
+                    else:
+                        reply_text = "Task completed."
+                        action_badge = "Brain: Ready"
+                else:
+                    # Multi-step Agentic tool planner (using lfm3-omni:2b if tools are strictly required)
+                    tool_model = "lfm3-omni:2b" if any("lfm3-omni" in m for m in installed_names) else chosen_model
+                    system_msg = {
+                        "role": "system",
+                        "content": (
+                            "You are VOID, the personal autonomous AI desktop assistant on Fedora Linux KDE Plasma. "
+                            "You have direct tool execution capabilities and access to 1.5GB persistent SSD memory.\n"
+                            f"Context & Preferences: {self.memory.get_context_summary()}\n"
+                            "STRICT BEHAVIOR RULES:\n0. CRITICAL: EXECUTE ONLY THE USER'S CURRENT REQUEST. DO NOT re-execute, repeat, or resurrect tasks, tool calls, or actions from previous turns. Treat each user message as a distinct goal.\n"
+                            "1. NEVER introduce yourself unless the user explicitly asks 'who are you'. NEVER begin responses with 'I am VOID' or 'As an AI assistant'.\n"
+                            "2. AUTONOMOUS TASK PLANNING & EXECUTION: You possess full capability to plan and execute multi-step complex tasks. When the user gives a complex goal, formulate a clear sequential plan, decompose it into sub-goals, and invoke necessary tools step by step until the goal is fully achieved.\n"
+                            "3. BROWSER & TAB EXECUTION: NEVER automatically open Chromium tabs or windows for general questions, summaries, or web research. Only call 'browser_open' when the user explicitly requests to open a website on screen, open a new tab, or open a browser window. To close an active tab, invoke 'browser_close_tab'. For general web knowledge, use 'search_web' (headless) and answer in text/voice without launching the browser GUI.\n"
+                            "4. Provide a direct, concise final response (1-2 sentences maximum) summarizing the completed plan and actions."
+                        ),
+                    }
+                    messages = [system_msg, *self._chat_history[-6:], {"role": "user", "content": query}]
+                    max_agent_steps = 6
+                    current_step = 0
+                    all_executed_names = []
 
-                    if res.status_code != 200:
-                        break
-
-                    msg = res.json().get("message", {})
-                    tool_calls = msg.get("tool_calls", [])
-
-                    if not tool_calls:
-                        reply_text = msg.get("content", "").strip()
-                        break
-
-                    messages.append(msg)
-                    for tc in tool_calls:
+                    while current_step < max_agent_steps:
                         if self._abort_requested.is_set():
                             return ("Thinking process stopped by user.", "Cancelled", "")
-                        fn = tc.get("function", {})
-                        fn_name = fn.get("name", "")
-                        fn_args = fn.get("arguments", {})
-                        all_executed_names.append(fn_name)
-                        tool_result = self._execute_ai_tool(fn_name, fn_args, query_context=query)
-                        if str(tool_result).startswith("PROMPT_USER:"):
-                            prompt_q = str(tool_result).replace("PROMPT_USER:", "").strip()
-                            badge = "Prompt: Recipient" if ("recipient" in prompt_q.lower() or "email" in prompt_q.lower()) else "Prompt: User Clarification"
-                            return (prompt_q, badge, "")
-                        if fn_name == "take_screenshot" and str(tool_result).startswith("/"):
-                            thumbnail_path = str(tool_result)
-                        messages.append({
-                            "role": "tool",
-                            "content": str(tool_result),
-                        })
+                        current_step += 1
+                        payload = {
+                            "model": tool_model,
+                            "messages": messages,
+                            "tools": TOOLS_SCHEMA,
+                            "options": {"num_thread": 4},
+                            "keep_alive": "5m",
+                            "stream": False,
+                        }
+                        try:
+                            res = httpx.post(f"{OLLAMA_URL}/api/chat", json=payload, timeout=25.0)
+                        except Exception as e:
+                            print(f"[VOID Brain HTTP Error] {e}", flush=True)
+                            break
 
-                if not reply_text and all_executed_names:
-                    reply_text = f"Executed {', '.join(all_executed_names)}."
+                        if res.status_code != 200:
+                            break
 
-                if all_executed_names:
-                    action_badge = f"Tools: {', '.join(all_executed_names[:2])}"
-                elif reply_text:
-                    action_badge = "Brain: lfm3-omni"
-                else:
-                    reply_text = "Task completed."
-                    action_badge = "Brain: Completed"
+                        msg = res.json().get("message", {})
+                        tool_calls = msg.get("tool_calls", [])
+
+                        if not tool_calls:
+                            reply_text = msg.get("content", "").strip()
+                            break
+
+                        messages.append(msg)
+                        for tc in tool_calls:
+                            if self._abort_requested.is_set():
+                                return ("Thinking process stopped by user.", "Cancelled", "")
+                            fn = tc.get("function", {})
+                            fn_name = fn.get("name", "")
+                            fn_args = fn.get("arguments", {})
+                            all_executed_names.append(fn_name)
+                            tool_result = self._execute_ai_tool(fn_name, fn_args, query_context=query)
+                            if str(tool_result).startswith("PROMPT_USER:"):
+                                prompt_q = str(tool_result).replace("PROMPT_USER:", "").strip()
+                                badge = "Prompt: Recipient" if ("recipient" in prompt_q.lower() or "email" in prompt_q.lower()) else "Prompt: User Clarification"
+                                return (prompt_q, badge, "")
+                            if fn_name == "take_screenshot" and str(tool_result).startswith("/"):
+                                thumbnail_path = str(tool_result)
+                            messages.append({
+                                "role": "tool",
+                                "content": str(tool_result),
+                            })
+
+                    if not reply_text and all_executed_names:
+                        reply_text = f"Executed {', '.join(all_executed_names)}."
+
+                    if all_executed_names:
+                        action_badge = f"Tools: {', '.join(all_executed_names[:2])}"
+                    elif reply_text:
+                        action_badge = f"Brain: {tool_model.split(':')[0]}"
+                    else:
+                        reply_text = "Task completed."
+                        action_badge = "Brain: Completed"
             except Exception as e:
                 reply_text = f"Could not process: {e}"
                 action_badge = "Brain Error"

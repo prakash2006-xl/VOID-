@@ -16,7 +16,7 @@ import httpx
 
 # Default Local Endpoint
 DEFAULT_OLLAMA_URL = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
-DEFAULT_LOCAL_MODEL = "lfm3-omni:2b"
+DEFAULT_LOCAL_MODEL = "nano-brain"
 
 def is_valid_api_key(key: Optional[str]) -> bool:
     """Validates whether an API key is a genuine secret and not an empty or placeholder string."""
