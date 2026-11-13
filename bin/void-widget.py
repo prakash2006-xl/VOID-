@@ -5037,8 +5037,8 @@ class AudioVoiceEngine(QObject):
 
             try:
                 from dodaios.plugins.tts.piper_local import PiperLocalTTS
-                self._tts = PiperLocalTTS(voice="vits-piper-en_US-ryan-medium", speed=1.06)
-                print("[VOID Audio] Piper neural TTS ready (speed=1.06).")
+                self._tts = PiperLocalTTS(voice="vits-piper-en_US-ryan-medium", speed=1.0)
+                print("[VOID Audio] Piper neural TTS ready (speed=1.0).")
             except Exception as e:
                 print(f"[VOID Audio Warning] Piper load: {e}")
 
@@ -7980,11 +7980,17 @@ if __name__ == "__main__":
         s = re.sub(r"\s+", " ", s).strip()
         s = re.sub(r"\?\s*", "? ", s)
 
-        # If response is long, extract the first 2 clear sentences for fluent, comprehensible speech
+        # Regulate long text responses for speech synthesis:
+        # Extract the first 2 clear sentences or first complete natural clause block
         if len(s) > 180:
             sentences = re.split(r"(?<=[.!?])\s+", s)
             if len(sentences) > 2:
                 s = " ".join(sentences[:2]).strip()
+            elif len(sentences) == 1:
+                # Text has no sentence terminators: split at comma or natural conjunction near 160 chars
+                clause_m = re.match(r"^(.{100,180}?)(?:[,;:]|\s+(?:and|but|while|which|with|that)\s+)", s, re.I)
+                if clause_m:
+                    s = clause_m.group(1).strip() + "."
 
         # Short and sweet announcement compression
         s = self._shorten_announcement(s)
@@ -8139,6 +8145,14 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"[VOID TTS Load Error] {e}", flush=True)
                 return
+
+        # Dynamically regulate TTS speed based on text length:
+        # Long/detailed responses adopt a calm, articulate 0.95x pace to eliminate rushing/over-speeding.
+        if self._tts is not None:
+            if len(clean) > 130:
+                self._tts._speed = 0.95
+            else:
+                self._tts._speed = 1.00
 
         self._is_speaking = True
         self.state_changed.emit("speaking")
