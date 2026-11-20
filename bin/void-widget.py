@@ -1047,6 +1047,9 @@ def kwin_manage_app_window(app_name: str, action: str) -> WindowResult:
     """Controls specific application windows on KDE Plasma Wayland via KWin Scripting and returns verified execution state."""
     import tempfile
     ensure_window_dbus_registered()
+    from PySide6.QtDBus import QDBusConnection
+    bus = QDBusConnection.sessionBus()
+    unique_service = bus.baseService() if bus.isConnected() else "org.void.WindowNotifier"
     clean_app = app_name.strip().lower()
     app_map = {
         "chromium": "chromium", "browser": "chromium", "chrome": "chromium", "firefox": "firefox",
@@ -1163,6 +1166,11 @@ def kwin_manage_app_window(app_name: str, action: str) -> WindowResult:
         }}
     }}
 
+    try {{
+        if ("{unique_service}") {{
+            callDBus("{unique_service}", "/WindowNotifier", "", "windowResult", matched, winTitle, winClass, act);
+        }}
+    }} catch(e) {{}}
     try {{
         callDBus("org.void.WindowNotifier", "/WindowNotifier", "", "windowResult", matched, winTitle, winClass, act);
     }} catch(e) {{}}
@@ -2110,6 +2118,8 @@ def normalize_voice_intent(text: str) -> str:
         (r"\b(?:off\s+load(ed|ing)?)\b", r"offload\1"),
         (r"\b(?:oped)\b", "stopped"),
         (r"\b(?:terminted|terminatd)\b", "terminated"),
+        (r"\b(?:terminate|terminated|terminating)\s+(?:the\s+|with\s+)?code[- ]?(?:0|zero|o|oh|null)\b", "terminate code 0"),
+        (r"\b(?:code[- ]?(?:0|zero|o|oh))\s+(?:terminate|stop|exit|shutdown)\b", "terminate code 0"),
         (r"\b(?:untill)\b", "until"),
         (r"\b(?:speach|spech|speeh|specht)\b", "speech"),
         (r"\b(?:txet|tetx)\b", "text"),
@@ -5253,6 +5263,8 @@ class AudioVoiceEngine(QObject):
                         "hey void", "hi void", "hello void", "okay void",
                         "hey computer", "wake up void",
                         "terminate code zero", "hey void terminate code zero",
+                        "terminate code 0", "hey void terminate code 0",
+                        "terminate code", "terminate",
                         "[unk]"
                     ])
                     self._recognizer = KaldiRecognizer(self._vosk_model, 16000.0, grammar)
@@ -5388,13 +5400,13 @@ class AudioVoiceEngine(QObject):
                                 if self._recognizer.AcceptWaveform(v_bytes):
                                     res = json.loads(self._recognizer.Result())
                                     text = res.get("text", "").lower().strip()
-                                    if any(w in text for w in ["terminate code zero", "hey void terminate code zero"]):
+                                    if any(w in text for w in ["terminate code zero", "hey void terminate code zero", "terminate code 0", "hey void terminate code 0", "terminate code", "terminate"]):
                                         self._handle_terminate()
                                     elif any(w in text for w in ["hey void", "hello void", "hi void", "okay void", "hey computer", "wake up void"]):
                                         self._handle_wake_text(text)
                                 else:
                                     partial = json.loads(self._recognizer.PartialResult()).get("partial", "").lower().strip()
-                                    if any(w in partial for w in ["terminate code zero", "hey void terminate code zero"]):
+                                    if any(w in partial for w in ["terminate code zero", "hey void terminate code zero", "terminate code 0", "hey void terminate code 0", "terminate code", "terminate"]):
                                         self._handle_terminate()
                                         self._recognizer.Reset()
                                     elif any(w in partial for w in ["hey void", "hello void", "hi void", "okay void", "hey computer", "wake up void"]):
@@ -6037,13 +6049,33 @@ class AudioVoiceEngine(QObject):
                 self._speak_text(reply_text)
                 return
 
-            # 0a. Instant Termination ("Hey VOID terminate code 0")
+            # 0a. Instant Termination ("Hey VOID terminate code 0" / Emergency Assistant Shutdown)
             q_norm = normalize_voice_intent(q_clean)
-            if any(p in q_norm for p in ["terminate code 0", "terminate code zero", "terminate code", "terminate void", "exit void", "stop void", "shutdown void", "shut down void"]):
+            is_terminate_code_0 = bool(
+                "terminate code 0" in q_norm.lower() or
+                re.search(r"\b(?:terminate|exit|quit|kill|stop|shut\s*down)\s+(?:the\s+)?(?:code\s*(?:0|zero|o|oh)|void|yourself|assistant|system\s*ai)\b", q_norm.lower()) or
+                re.search(r"\b(?:terminate\s+(?:with\s+)?code\s*(?:0|zero|o|oh))\b", q_norm.lower()) or
+                re.search(r"\b(?:code\s*(?:0|zero)\s+(?:terminate|stop|exit|shutdown))\b", q_norm.lower()) or
+                q_norm.lower().strip() in [
+                    "terminate code 0", "terminate code zero", "terminate code-0", "terminate code0",
+                    "terminate code", "terminate", "terminate void", "terminate yourself", "terminate assistant",
+                    "exit void", "stop void", "quit void", "shutdown void", "shut down void",
+                    "code 0", "code zero", "emergency terminate", "emergency stop"
+                ] or
+                any(p in q_norm.lower() for p in [
+                    "terminate code 0", "terminate code zero", "terminate code", "terminate void",
+                    "exit void", "stop void", "shutdown void", "shut down void"
+                ])
+            )
+            if is_terminate_code_0:
+                reply_text = "Terminating VOID assistant with Code 0. Goodbye."
+                action_badge = "VOID: Terminate 0"
+                print(f"[VOID Task] Terminate Code 0 command verified: '{query}'", flush=True)
+                self.response_ready.emit(query, reply_text, action_badge, "")
                 self.state_changed.emit("speaking")
                 play_chime("alarm")
-                self._speak_text("Terminating VOID. Goodbye.")
-                time.sleep(1.0)
+                self._speak_text(reply_text)
+                time.sleep(0.8)
                 self.terminate_requested.emit()
                 return
 
@@ -6157,6 +6189,28 @@ class AudioVoiceEngine(QObject):
         # 0. Anti-reintroduction fast path
         if not q_lower or q_lower in ["hey", "hello", "hi", "are you there", "listen", "wake up"]:
             return ("I'm listening.", "Status: Ready", "")
+
+        # 0-term. Instant Terminate Code 0 / Emergency Assistant Shutdown Fast Path
+        is_terminate_code_0 = bool(
+            "terminate code 0" in q_lower or
+            re.search(r"\b(?:terminate|exit|quit|kill|stop|shut\s*down)\s+(?:the\s+)?(?:code\s*(?:0|zero|o|oh)|void|yourself|assistant|system\s*ai)\b", q_lower) or
+            re.search(r"\b(?:terminate\s+(?:with\s+)?code\s*(?:0|zero|o|oh))\b", q_lower) or
+            re.search(r"\b(?:code\s*(?:0|zero)\s+(?:terminate|stop|exit|shutdown))\b", q_lower) or
+            q_lower.strip() in [
+                "terminate code 0", "terminate code zero", "terminate code-0", "terminate code0",
+                "terminate code", "terminate", "terminate void", "terminate yourself", "terminate assistant",
+                "exit void", "stop void", "quit void", "shutdown void", "shut down void",
+                "code 0", "code zero", "emergency terminate", "emergency stop"
+            ] or
+            any(p in q_lower for p in [
+                "terminate code 0", "terminate code zero", "terminate code", "terminate void",
+                "exit void", "stop void", "shutdown void", "shut down void"
+            ])
+        )
+        if is_terminate_code_0:
+            print("[VOID] Terminate Code 0 received in _execute_single_command. Shutting down assistant.", flush=True)
+            self.terminate_requested.emit()
+            return ("Terminating VOID assistant with Code 0. Goodbye.", "VOID: Terminate 0", "")
 
         # 0a0. Open Settings / Configuration Window Fast Path
         is_close_or_min = any(w in q_lower for w in ["close", "kill", "exit", "quit", "shut", "minimize", "minimise", "hide"])
@@ -9803,6 +9857,10 @@ class VoidMiniWidget(QWidget):
 
     def _on_terminate(self) -> None:
         print("[VOID] Terminate code 0 received. Shutting down assistant permanently...")
+        try:
+            stop_all_ollama_models(kill_server=True)
+        except Exception:
+            pass
         for p in [CONFIG_DIR / ".void_launcher.json", Path.home() / ".dodaios/data/.void_launcher.json"]:
             try:
                 if p.exists():

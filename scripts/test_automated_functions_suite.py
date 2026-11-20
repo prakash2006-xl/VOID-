@@ -23,11 +23,16 @@ sys.path.insert(0, str(VOID_ROOT))
 import importlib.util
 
 # Load bin/void-widget.py dynamically
+from PySide6.QtWidgets import QApplication
+if not QApplication.instance():
+    _qapp = QApplication(sys.argv)
+
 widget_path = VOID_ROOT / "bin/void-widget.py"
 spec = importlib.util.spec_from_file_location("void_widget", str(widget_path))
 void_widget = importlib.util.module_from_spec(spec)
 sys.modules["void_widget"] = void_widget
 spec.loader.exec_module(void_widget)
+void_widget.ensure_window_dbus_registered()
 
 def test_window_control_real_and_truthful():
     print("\n--- Test 1: Window Control & Truthful Execution ---")
@@ -182,6 +187,42 @@ def test_youtube_accurate_query_resolution():
     
     print("✅ Test 5 Passed: Accurate music and song query resolution verified.")
 
+def test_terminate_code_0_mechanism():
+    print("\n--- Test 6: Terminate Code 0 & Emergency Assistant Shutdown ---")
+    engine = void_widget.AudioVoiceEngine(void_widget.DodaiosToolHub())
+    
+    test_queries = [
+        "terminate code 0",
+        "terminate code zero",
+        "terminate the code 0",
+        "terminate with code 0",
+        "terminate code-0",
+        "terminate code0",
+        "terminate code",
+        "terminate void",
+        "terminate",
+        "code 0",
+        "code zero",
+        "please terminate code 0",
+        "hey void terminate code 0",
+        "void terminate code 0"
+    ]
+    
+    for q in test_queries:
+        received = []
+        def slot():
+            received.append(True)
+        engine.terminate_requested.connect(slot)
+        
+        r_text, r_badge, _ = engine._execute_single_command(q)
+        assert len(received) > 0, f"terminate_requested signal was not emitted for: '{q}'"
+        assert "Terminating VOID" in r_text, f"Unexpected response text for '{q}': {r_text}"
+        assert r_badge == "VOID: Terminate 0", f"Unexpected badge for '{q}': {r_badge}"
+        engine.terminate_requested.disconnect(slot)
+        
+    print(f"Verified {len(test_queries)} Terminate Code 0 variants without false refusals.")
+    print("✅ Test 6 Passed: Terminate Code 0 and emergency assistant shutdown verified.")
+
 def main():
     print("==================================================")
     print("STARTING VOID AI COMPREHENSIVE AUTOMATED TESTS")
@@ -192,9 +233,10 @@ def main():
     test_email_composing_mechanism()
     test_local_model_fallback_and_truthful_execution()
     test_youtube_accurate_query_resolution()
+    test_terminate_code_0_mechanism()
     
     print("\n==================================================")
-    print("ALL 5 AUTOMATED TEST SUITES PASSED SUCCESSFULLY (5/5)!")
+    print("ALL 6 AUTOMATED TEST SUITES PASSED SUCCESSFULLY (6/6)!")
     print("==================================================")
 
 if __name__ == "__main__":
